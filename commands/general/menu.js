@@ -42,7 +42,7 @@ module.exports = {
       menuText += `┃  Cmds: ${commands.size}\n`;
       menuText += `╰━━━━━━━━━━━━━━━╯\n\n`;
 
-      // Define category order and display names (UTILITY aur TEXTMAKER add kar diye)
+      // Define category order and display names
       const categoryOrder = [
         { key: 'general', name: 'GENERAL COMMANDS' },
         { key: 'ai', name: 'AI COMMANDS' },
@@ -50,9 +50,9 @@ module.exports = {
         { key: 'owner', name: 'OWNER COMMANDS' },
         { key: 'media', name: 'MEDIA COMMANDS' },
         { key: 'fun', name: 'FUN COMMANDS' },
-        { key: 'utility', name: 'UTILITY COMMANDS' },      // ✅ FIXED: Add kiya
+        { key: 'utility', name: 'UTILITY COMMANDS' },
         { key: 'anime', name: 'ANIME COMMANDS' },
-        { key: 'textmaker', name: 'TEXTMAKER COMMANDS' }   // ✅ FIXED: Add kiya
+        { key: 'textmaker', name: 'TEXTMAKER COMMANDS' }
       ];
 
       for (const cat of categoryOrder) {
