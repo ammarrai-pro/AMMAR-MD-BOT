@@ -18,97 +18,148 @@ function toJid(num) {
 
 module.exports = {
   name: 'boom',
-  aliases: ['repeat', 'spam', 'bomb'],
+  aliases: ['bomb', 'spam', 'anonymous'],
   category: 'fun',
-  description: 'Unlimited message bomber - Send multiple messages rapidly (Owner Only)',
-  usage: '.boom <message,count[,number]>',
+  description: 'Anonymous Unlimited Bomber - Send messages without revealing sender',
+  usage: '.boom <message,count,number>',
 
-  // 🔒 SIRF OWNER USE KAR SAKTA HAI
-  ownerOnly: true,      // ✅ Sirf owner
-  modOnly: false,       // ❌ Mods nahi kar sakte
-  groupOnly: false,     // ✅ Group mein bhi work karega
-  privateOnly: false,   // ✅ Private mein bhi work karega
-  adminOnly: false,     // ❌ Group admin hone se nahi chalega (sirf owner)
+  // 🔒 SIRF OWNER AUR BOT NUMBER WALA
+  ownerOnly: false,  // Khud se handle karenge
+  modOnly: false,
+  groupOnly: false,   // ✅ Group mein bhi chalega
+  privateOnly: false, // ✅ Private mein bhi chalega
+  adminOnly: false,
   botAdminNeeded: false,
 
   async execute(sock, msg, args, extra) {
     try {
-      // 🔒 EXTRA SECURITY: Check again if owner
-      const ownerNumber = config.ownerNumber || config.OWNER_NUMBER;
-      const senderNumber = msg.key.remoteJid?.split('@')[0] || msg.pushName;
+      // Get sender info
+      const senderNumber = msg.key.remoteJid?.split('@')[0] || '';
+      const senderName = msg.pushName || 'User';
+      const isGroup = extra.isGroup || false;
       
-      // Agar owner nahi hai to block karo
-      if (ownerNumber && !ownerNumber.includes(senderNumber)) {
-        await extra.reply('❌ *Access Denied!*\n\nThis command can only be used by the BOT OWNER.');
+      // 🔐 ALLOWED USERS: Owner + Bot Number Owner
+      const ownerNumber = config.ownerNumber || config.OWNER_NUMBER || '';
+      const botNumber = config.botNumber || config.BOT_NUMBER || '';
+      
+      // Clean numbers for comparison
+      const cleanSender = normalizeNumber(senderNumber);
+      const cleanOwner = normalizeNumber(ownerNumber);
+      const cleanBot = normalizeNumber(botNumber);
+      
+      // Check if sender is authorized (Owner OR Bot Number owner)
+      const isAuthorized = (cleanOwner && cleanSender === cleanOwner) || 
+                          (cleanBot && cleanSender === cleanBot);
+      
+      if (!isAuthorized) {
+        await extra.reply(
+          '❌ *Access Denied!*\n\n' +
+          'Only the following can use this command:\n' +
+          '• Bot Owner\n' +
+          '• Person whose number is connected to the bot\n\n' +
+          '_Contact owner for access._'
+        );
         return;
       }
       
       const raw = args.join(' ').trim();
       if (!raw) {
         return extra.reply(
-          '*💣 UNLIMITED BOMBER (OWNER ONLY)*\n\n' +
-          '• `.boom hello,100` (100 times in current chat)\n' +
-          '• `.boom hi,500,923027598023` (send to that number)\n' +
-          '• `.boom test,50` (works in groups too!)\n\n' +
-          '⚠️ *NO LIMIT - Use responsibly!*\n' +
-          '🔒 *Owner Only Command*'
+          '*💣 ANONYMOUS UNLIMITED BOMBER*\n\n' +
+          '✅ *Group Support*\n' +
+          '✅ *Private Chat Support*\n' +
+          '✅ *Anonymous Sending*\n\n' +
+          '*Usage:*\n' +
+          '• `.boom Hello,100,923001234567` (send to number)\n' +
+          '• `.boom Hi,50` (send to current chat)\n' +
+          '• `.boom Hey,200` (send to current group)\n\n' +
+          '🔒 *Authorized: Bot Owner & Bot Number User*\n' +
+          '⚠️ *Target will NOT know who sent!*'
         );
       }
 
       const parts = raw.split(',').map(x => x.trim());
       const message = parts[0];
       const count = parseInt(parts[1]);
-      const num = parts[2] || '';
-
-      // Validation - NO UPPER LIMIT
+      let targetNumber = parts[2] || ''; // Optional now
+      
+      // Validation
       if (!message || isNaN(count) || count <= 0) {
         return extra.reply(
-          '_Format:_ `.boom message,count[,number]`\n' +
-          '_Note:_ count must be a positive number (no upper limit!)\n\n' +
-          '_Example:_ `.boom Hello,100` or `.boom Hi,50,923001234567`'
+          '❌ *Wrong format!*\n\n' +
+          '• Current chat: `.boom Hello,50`\n' +
+          '• Specific number: `.boom Hello,50,923001234567`\n' +
+          '• Group: `.boom Hello,100`\n\n' +
+          'Count must be a positive number (no limit!)'
         );
       }
-
-      // Warning for very large counts
+      
+      // Determine target
+      let targetJid;
+      let targetDisplay;
+      let isTargetNumber = false;
+      
+      if (targetNumber) {
+        // Send to specific number
+        const cleanTarget = normalizeNumber(targetNumber);
+        if (!cleanTarget || cleanTarget.length < 10) {
+          return extra.reply('❌ Invalid number! Use: 923001234567 (with country code)');
+        }
+        targetJid = toJid(cleanTarget);
+        targetDisplay = cleanTarget;
+        isTargetNumber = true;
+      } else {
+        // Send to current chat (group or private)
+        targetJid = extra.from;
+        if (isGroup) {
+          targetDisplay = 'this group';
+        } else {
+          targetDisplay = 'this chat';
+        }
+        isTargetNumber = false;
+      }
+      
+      // Warning for large counts
       if (count > 500) {
-        await extra.reply(`⚠️ *WARNING Owner!*\n\nYou're about to send ${count.toLocaleString()} messages!\nThis may get you rate-limited.\n\n_Starting in 5 seconds..._`);
+        await extra.reply(
+          `⚠️ *WARNING!*\n\n` +
+          `Sending ${count.toLocaleString()} anonymous messages to ${targetDisplay}\n` +
+          `Target will NOT know who sent.\n\n` +
+          `_Starting in 5 seconds..._`
+        );
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
-
-      // Determine target JID
-      let targetJid;
-      let targetDisplay = num || (extra.isGroup ? 'this group' : 'this chat');
       
-      if (num) {
-        targetJid = toJid(num);
-        if (!targetJid) {
-          return extra.reply('_Invalid number. Use format with country code (e.g., 923001234567)_');
-        }
-      } else {
-        targetJid = extra.from; // current chat (group or private)
-      }
-
+      // Show starting message (only visible to sender)
       await extra.react('💣');
-      await extra.reply(`🚀 Starting bomb: ${count.toLocaleString()} messages to ${targetDisplay}`);
-
-      // Adaptive delay based on count
-      let delay = 200; // base 200ms
+      await extra.reply(
+        `🚀 *Starting Anonymous Bomb*\n\n` +
+        `📨 Messages: ${count.toLocaleString()}\n` +
+        `📍 Target: ${targetDisplay}\n` +
+        `🔇 Anonymous Mode: ON\n\n` +
+        `_Sending..._`
+      );
+      
+      // Adaptive delay
+      let delay = 250;
       if (count > 500) delay = 400;
       if (count > 1000) delay = 600;
       if (count > 5000) delay = 800;
-
+      
       let successCount = 0;
       let failCount = 0;
-
-      // Send messages
+      
+      // Send messages anonymously
       for (let i = 1; i <= count; i++) {
         try {
-          await sock.sendMessage(targetJid, { text: message });
+          await sock.sendMessage(targetJid, { 
+            text: message
+          });
           successCount++;
           
-          // Show progress every 100 messages
-          if (i % 100 === 0) {
-            await extra.reply(`📊 Progress: ${i}/${count} messages sent`);
+          // Progress update every 100 messages (only to sender)
+          if (i % 100 === 0 && i < count) {
+            await extra.reply(`📊 Progress: ${i}/${count} messages sent to ${targetDisplay}`);
           }
           
           // Delay to avoid rate limits
@@ -118,33 +169,33 @@ module.exports = {
           
         } catch (err) {
           failCount++;
-          console.error(`Failed to send message ${i}:`, err);
+          console.error(`Failed message ${i}:`, err);
           
-          // If too many failures, stop
           if (failCount > 10) {
-            await extra.reply(`❌ Stopped due to ${failCount} failures. Rate limited?`);
+            await extra.reply(`❌ Stopped: Too many failures (${failCount}). Rate limited?`);
             break;
           }
           
-          // Increase delay on failure
           delay += 100;
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
-
+      
+      // Final report (only to sender)
       await extra.react('💥');
       await extra.reply(
-        `✅ *Bombing Complete!*\n\n` +
+        `✅ *Anonymous Bomb Complete!*\n\n` +
+        `📍 Target: ${targetDisplay}\n` +
         `📨 Sent: ${successCount.toLocaleString()}\n` +
         `❌ Failed: ${failCount}\n` +
-        `📍 Target: ${targetDisplay}\n` +
+        `📝 Message: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}\n` +
         `⚡ Speed: ~${Math.round(successCount / ((successCount + failCount) * delay / 1000)) || 1} msg/sec\n\n` +
-        `🔒 Command used by: Owner`
+        `🔇 *Target has NO idea who sent!*`
       );
       
     } catch (error) {
-      console.error('Boom command error:', error);
-      await extra.reply('❌ An error occurred while sending messages.');
+      console.error('Anonymous Bomber Error:', error);
+      await extra.reply('❌ Anonymous bomber failed. Check console.');
       await extra.react('❌');
     }
   }
