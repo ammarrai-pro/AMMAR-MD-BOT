@@ -23,156 +23,109 @@ module.exports = {
   description: 'Anonymous Unlimited Bomber - Send messages without revealing sender',
   usage: '.boom <message,count,number>',
 
-  // 🔒 SIRF OWNER AUR BOT NUMBER WALA
-  ownerOnly: false,  // Khud se handle karenge
+  // 🔒 SIRF OWNER
+  ownerOnly: true,
   modOnly: false,
-  groupOnly: false,   // ✅ Group mein bhi chalega
-  privateOnly: false, // ✅ Private mein bhi chalega
+  groupOnly: false,
+  privateOnly: false,
   adminOnly: false,
   botAdminNeeded: false,
 
   async execute(sock, msg, args, extra) {
     try {
-      // Get sender info
-      const senderNumber = msg.key.remoteJid?.split('@')[0] || '';
-      const senderName = msg.pushName || 'User';
-      const isGroup = extra.isGroup || false;
+      // Owner verification
+      const ownerNumber = config.ownerNumber || config.OWNER_NUMBER;
+      const senderNumber = msg.key.remoteJid?.split('@')[0] || msg.pushName;
       
-      // 🔐 ALLOWED USERS: Owner + Bot Number Owner
-      const ownerNumber = config.ownerNumber || config.OWNER_NUMBER || '';
-      const botNumber = config.botNumber || config.BOT_NUMBER || '';
-      
-      // Clean numbers for comparison
-      const cleanSender = normalizeNumber(senderNumber);
-      const cleanOwner = normalizeNumber(ownerNumber);
-      const cleanBot = normalizeNumber(botNumber);
-      
-      // Check if sender is authorized (Owner OR Bot Number owner)
-      const isAuthorized = (cleanOwner && cleanSender === cleanOwner) || 
-                          (cleanBot && cleanSender === cleanBot);
-      
-      if (!isAuthorized) {
-        await extra.reply(
-          '❌ *Access Denied!*\n\n' +
-          'Only the following can use this command:\n' +
-          '• Bot Owner\n' +
-          '• Person whose number is connected to the bot\n\n' +
-          '_Contact owner for access._'
-        );
+      if (ownerNumber && !ownerNumber.includes(senderNumber)) {
+        await extra.reply('❌ *Access Denied!*\n\nOnly bot owner can use this command.');
         return;
       }
       
       const raw = args.join(' ').trim();
       if (!raw) {
         return extra.reply(
-          '*💣 ANONYMOUS UNLIMITED BOMBER*\n\n' +
-          '✅ *Group Support*\n' +
-          '✅ *Private Chat Support*\n' +
-          '✅ *Anonymous Sending*\n\n' +
-          '*Usage:*\n' +
-          '• `.boom Hello,100,923001234567` (send to number)\n' +
-          '• `.boom Hi,50` (send to current chat)\n' +
-          '• `.boom Hey,200` (send to current group)\n\n' +
-          '🔒 *Authorized: Bot Owner & Bot Number User*\n' +
-          '⚠️ *Target will NOT know who sent!*'
+          '*💣 ANONYMOUS UNLIMITED BOMBER (Owner Only)*\n\n' +
+          '• `.boom Hello,100,923001234567`\n' +
+          '• `.boom Hi,500,923162563671`\n\n' +
+          '✨ *Features:*\n' +
+          '• Target will NOT know who sent\n' +
+          '• NO sender name/number visible\n' +
+          '• Completely anonymous\n' +
+          '• Unlimited messages\n\n' +
+          '⚠️ *Use responsibly!*'
         );
       }
 
       const parts = raw.split(',').map(x => x.trim());
-      const message = parts[0];
-      const count = parseInt(parts[1]);
-      let targetNumber = parts[2] || ''; // Optional now
+      
+      // Format: message, count, number
+      let message = parts[0];
+      let count = parseInt(parts[1]);
+      let targetNumber = parts[2];
       
       // Validation
-      if (!message || isNaN(count) || count <= 0) {
+      if (!message || isNaN(count) || count <= 0 || !targetNumber) {
         return extra.reply(
           '❌ *Wrong format!*\n\n' +
-          '• Current chat: `.boom Hello,50`\n' +
-          '• Specific number: `.boom Hello,50,923001234567`\n' +
-          '• Group: `.boom Hello,100`\n\n' +
-          'Count must be a positive number (no limit!)'
+          'Use: `.boom Your message,100,923001234567`\n\n' +
+          'Example: `.boom Hello,50,923162563671`\n\n' +
+          '📌 Number must include country code (e.g., 92 for Pakistan)'
         );
       }
-      
-      // Determine target
-      let targetJid;
-      let targetDisplay;
-      let isTargetNumber = false;
-      
-      if (targetNumber) {
-        // Send to specific number
-        const cleanTarget = normalizeNumber(targetNumber);
-        if (!cleanTarget || cleanTarget.length < 10) {
-          return extra.reply('❌ Invalid number! Use: 923001234567 (with country code)');
-        }
-        targetJid = toJid(cleanTarget);
-        targetDisplay = cleanTarget;
-        isTargetNumber = true;
-      } else {
-        // Send to current chat (group or private)
-        targetJid = extra.from;
-        if (isGroup) {
-          targetDisplay = 'this group';
-        } else {
-          targetDisplay = 'this chat';
-        }
-        isTargetNumber = false;
+
+      // Clean number
+      const cleanNumber = normalizeNumber(targetNumber);
+      if (!cleanNumber || cleanNumber.length < 10) {
+        return extra.reply('❌ Invalid number! Use: 923001234567 (with country code)');
       }
+
+      const targetJid = toJid(cleanNumber);
       
       // Warning for large counts
       if (count > 500) {
-        await extra.reply(
-          `⚠️ *WARNING!*\n\n` +
-          `Sending ${count.toLocaleString()} anonymous messages to ${targetDisplay}\n` +
-          `Target will NOT know who sent.\n\n` +
-          `_Starting in 5 seconds..._`
-        );
+        await extra.reply(`⚠️ *WARNING Owner!*\n\nSending ${count.toLocaleString()} anonymous messages to ${cleanNumber}\nTarget will NOT know it was you.\n\n_Starting in 5 seconds..._`);
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
-      
-      // Show starting message (only visible to sender)
+
       await extra.react('💣');
-      await extra.reply(
-        `🚀 *Starting Anonymous Bomb*\n\n` +
-        `📨 Messages: ${count.toLocaleString()}\n` +
-        `📍 Target: ${targetDisplay}\n` +
-        `🔇 Anonymous Mode: ON\n\n` +
-        `_Sending..._`
-      );
-      
+      await extra.reply(`🚀 Starting ANONYMOUS bomb: ${count.toLocaleString()} messages to ${cleanNumber}\n\n🔇 Target will NOT know who sent these!`);
+
       // Adaptive delay
       let delay = 250;
       if (count > 500) delay = 400;
       if (count > 1000) delay = 600;
       if (count > 5000) delay = 800;
-      
+
       let successCount = 0;
       let failCount = 0;
-      
-      // Send messages anonymously
+
+      // ANONYMOUS SENDING - No sender info, no bot traces
       for (let i = 1; i <= count; i++) {
         try {
+          // Send message WITHOUT any sender identification
           await sock.sendMessage(targetJid, { 
             text: message
+            // No quoted message, no context info, no mentions
           });
+          
           successCount++;
           
-          // Progress update every 100 messages (only to sender)
-          if (i % 100 === 0 && i < count) {
-            await extra.reply(`📊 Progress: ${i}/${count} messages sent to ${targetDisplay}`);
+          // Progress only visible to owner (in owner's chat)
+          if (i % 100 === 0) {
+            await extra.reply(`📊 Anonymous Progress: ${i}/${count} sent to ${cleanNumber}`);
           }
           
-          // Delay to avoid rate limits
           if (delay > 0 && count > 50) {
             await new Promise(resolve => setTimeout(resolve, delay));
           }
           
         } catch (err) {
           failCount++;
-          console.error(`Failed message ${i}:`, err);
+          console.error(`Failed: ${i}`, err);
           
           if (failCount > 10) {
-            await extra.reply(`❌ Stopped: Too many failures (${failCount}). Rate limited?`);
+            await extra.reply(`❌ Stopped: ${failCount} failures. Rate limited?`);
             break;
           }
           
@@ -180,17 +133,15 @@ module.exports = {
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
-      
-      // Final report (only to sender)
+
       await extra.react('💥');
       await extra.reply(
         `✅ *Anonymous Bomb Complete!*\n\n` +
-        `📍 Target: ${targetDisplay}\n` +
+        `📱 Target: ${cleanNumber}\n` +
         `📨 Sent: ${successCount.toLocaleString()}\n` +
         `❌ Failed: ${failCount}\n` +
-        `📝 Message: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}\n` +
-        `⚡ Speed: ~${Math.round(successCount / ((successCount + failCount) * delay / 1000)) || 1} msg/sec\n\n` +
-        `🔇 *Target has NO idea who sent!*`
+        `📝 Message: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}\n\n` +
+        `🔇 *Target has NO idea who sent these messages!*`
       );
       
     } catch (error) {
