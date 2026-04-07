@@ -8,9 +8,7 @@ module.exports = {
   async execute(sock, msg, args, extra) {
     await extra.reply(
       `🤖 *AMMAR MD BOT WEBSITE*\n\n` +
-      `🌐 ${'='.repeat(30)}\n\n` +
-      `https://ammar-md-bot.page.gd/\n\n` +
-      `🌐 ${'='.repeat(30)}`
+      `https://ammar-md-bot.page.gd/`
     );
   }
 };
