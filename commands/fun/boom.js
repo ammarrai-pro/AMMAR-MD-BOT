@@ -18,12 +18,11 @@ function toJid(num) {
 
 module.exports = {
   name: 'boom',
-  aliases: ['bomb', 'spam', 'anonymous', 'blast'],
+  aliases: ['bomb', 'spam', 'blast'],
   category: 'fun',
-  description: 'Unlimited Message Bomber - Send multiple messages rapidly (Everyone can use)',
-  usage: '.boom <message,count[,number]>',
+  description: 'Unlimited Message Bomber',
+  usage: '.boom <message,count> or .boom <message,count,number>',
 
-  // 🌍 EVERYONE CAN USE - No restrictions
   ownerOnly: false,
   modOnly: false,
   groupOnly: false,
@@ -33,142 +32,133 @@ module.exports = {
 
   async execute(sock, msg, args, extra) {
     try {
+      // DEBUG: Log to console
+      console.log('=== BOOM COMMAND TRIGGERED ===');
+      console.log('Raw args:', args);
+      console.log('Is Group:', extra.isGroup);
+      console.log('From:', extra.from);
+      
       const raw = args.join(' ').trim();
+      
+      // DEBUG: Show what user typed
       if (!raw) {
         return extra.reply(
-          '*💣 UNLIMITED MESSAGE BOMBER (PUBLIC)*\n\n' +
-          '✨ *Everyone can use this command!*\n\n' +
-          '*Usage:*\n' +
-          '• `.boom Hello,100` (send to current chat)\n' +
-          '• `.boom Hi,50,923001234567` (send to any number)\n' +
-          '• `.boom Hey,200` (send to current group)\n\n' +
-          '*Features:*\n' +
-          '✅ Unlimited messages (no limit)\n' +
-          '✅ Works in groups & private chats\n' +
-          '✅ Send to any WhatsApp number\n' +
-          '✅ Auto delay to avoid ban\n\n' +
-          '⚠️ *Use responsibly!*'
+          '*💣 MESSAGE BOMBER*\n\n' +
+          '• `.boom Hello,10` (send in this chat)\n' +
+          '• `.boom Hi,50,923001234567` (send to number)\n\n' +
+          '_Make sure to use COMMA (,) not space_\n' +
+          `_You typed: ${raw || 'nothing'}_`
         );
       }
 
-      const parts = raw.split(',').map(x => x.trim());
-      const message = parts[0];
-      const count = parseInt(parts[1]);
-      const targetNumber = parts[2] || '';
+      // Parse with better logic
+      let message, count, targetNumber;
+      
+      // Try to parse: message,count,number
+      const commaParts = raw.split(',').map(x => x.trim());
+      
+      if (commaParts.length >= 2) {
+        message = commaParts[0];
+        count = parseInt(commaParts[1]);
+        targetNumber = commaParts[2] || '';
+      } else {
+        // If no comma, try to split by space for backward compatibility
+        const spaceParts = raw.split(' ');
+        if (spaceParts.length >= 2) {
+          message = spaceParts[0];
+          count = parseInt(spaceParts[1]);
+          targetNumber = spaceParts[2] || '';
+        } else {
+          return extra.reply('❌ Use format: `.boom message,count` or `.boom message count`');
+        }
+      }
       
       // Validation
       if (!message || isNaN(count) || count <= 0) {
         return extra.reply(
-          '❌ *Wrong format!*\n\n' +
-          '• Current chat: `.boom Hello,50`\n' +
-          '• Specific number: `.boom Hello,50,923001234567`\n\n' +
-          'Count must be a positive number (no limit!)'
+          '❌ *Invalid format!*\n\n' +
+          '✅ Correct formats:\n' +
+          '• `.boom Hello,10`\n' +
+          '• `.boom Hi,50,923001234567`\n\n' +
+          `📝 You typed: ${raw}\n` +
+          `📊 Message: ${message || 'missing'}\n` +
+          `🔢 Count: ${count || 'missing'}`
         );
       }
       
-      // Limit warning for very high counts (optional, not a hard limit)
-      if (count > 1000) {
-        await extra.reply(
-          `⚠️ *WARNING!*\n\n` +
-          `You're about to send ${count.toLocaleString()} messages!\n` +
-          `This may get you rate-limited by WhatsApp.\n\n` +
-          `_Starting in 3 seconds..._`
-        );
-        await new Promise(resolve => setTimeout(resolve, 3000));
+      // Limit count for safety (remove this if you want unlimited)
+      const MAX_COUNT = 500; // Set to 500 for safety in groups
+      if (count > MAX_COUNT) {
+        return extra.reply(`⚠️ Max ${MAX_COUNT} messages allowed for safety. You requested ${count}.`);
       }
       
       // Determine target
       let targetJid;
       let targetDisplay;
-      const isGroup = extra.isGroup || false;
       
       if (targetNumber) {
-        // Send to specific number
         const cleanTarget = normalizeNumber(targetNumber);
         if (!cleanTarget || cleanTarget.length < 10) {
-          return extra.reply('❌ Invalid number! Use: 923001234567 (with country code)');
+          return extra.reply('❌ Invalid number! Use: 923001234567');
         }
         targetJid = toJid(cleanTarget);
         targetDisplay = cleanTarget;
       } else {
-        // Send to current chat
         targetJid = extra.from;
-        if (isGroup) {
-          targetDisplay = 'this group';
-        } else {
-          targetDisplay = 'this chat';
-        }
+        targetDisplay = extra.isGroup ? 'this group' : 'this chat';
       }
       
-      // Show starting message
-      await extra.react('💣');
+      // Send confirmation
       await extra.reply(
-        `🚀 *Starting Bomb*\n\n` +
-        `📨 Messages: ${count.toLocaleString()}\n` +
+        `🚀 *Bomb Started*\n\n` +
+        `📝 Message: ${message}\n` +
+        `🔢 Count: ${count}\n` +
         `📍 Target: ${targetDisplay}\n` +
-        `👤 Requester: ${msg.pushName || 'User'}\n\n` +
+        `⏱️ This will take ~${Math.ceil(count * 0.3)} seconds\n\n` +
         `_Sending..._`
       );
       
-      // Adaptive delay based on count
-      let delay = 200; // 200ms base
-      if (count > 500) delay = 300;
-      if (count > 1000) delay = 500;
-      if (count > 5000) delay = 800;
-      
+      // Send messages
       let successCount = 0;
       let failCount = 0;
+      const delay = 300; // 300ms delay
       
-      // Send messages
       for (let i = 1; i <= count; i++) {
         try {
-          await sock.sendMessage(targetJid, { 
-            text: message
-          });
+          await sock.sendMessage(targetJid, { text: message });
           successCount++;
           
-          // Show progress every 100 messages
-          if (i % 100 === 0 && i < count) {
-            await extra.reply(`📊 Progress: ${i}/${count} messages sent`);
+          // Show progress every 10 messages (more frequent for groups)
+          if (i % 10 === 0 && i < count) {
+            await extra.reply(`📊 Progress: ${i}/${count} sent`);
           }
           
-          // Add delay to avoid rate limiting
-          if (delay > 0 && count > 50) {
+          // Delay
+          if (count > 10) {
             await new Promise(resolve => setTimeout(resolve, delay));
           }
           
         } catch (err) {
           failCount++;
-          console.error(`Failed message ${i}:`, err);
-          
-          // Stop if too many failures
-          if (failCount > 10) {
-            await extra.reply(`❌ Stopped due to ${failCount} failures. Rate limited?`);
+          console.error(`Failed: ${i}`, err);
+          if (failCount > 5) {
+            await extra.reply(`❌ Stopped: Too many failures. Rate limited?`);
             break;
           }
-          
-          // Increase delay on failure
-          delay += 100;
-          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
       
       // Final report
-      await extra.react('💥');
       await extra.reply(
         `✅ *Bomb Complete!*\n\n` +
-        `📍 Target: ${targetDisplay}\n` +
-        `📨 Sent: ${successCount.toLocaleString()}\n` +
+        `✅ Sent: ${successCount}\n` +
         `❌ Failed: ${failCount}\n` +
-        `📝 Message: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}\n` +
-        `⚡ Speed: ~${Math.round(successCount / ((successCount + failCount) * delay / 1000)) || 1} msg/sec\n\n` +
-        `👤 Sent by: ${msg.pushName || 'User'}`
+        `📍 Target: ${targetDisplay}`
       );
       
     } catch (error) {
-      console.error('Boom command error:', error);
-      await extra.reply('❌ An error occurred while sending messages.');
-      await extra.react('❌');
+      console.error('Boom Error:', error);
+      await extra.reply(`❌ Error: ${error.message}`);
     }
   }
 };
