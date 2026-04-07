@@ -10,123 +10,97 @@ module.exports = {
   async execute(sock, msg, args, extra) {
     // Check if number provided
     if (!args[0]) {
-      const helpMsg = 
-`🔍 *NAME FINDER* 🔍
-
-━━━━━━━━━━━━━━━━━━━━━━
-📌 *Command:* .namefinder <number>
-📌 *Example:* .namefinder 03018787786
-📌 *Example:* .namefinder +923018787786
-━━━━━━━━━━━━━━━━━━━━━━
-
-✨ *Features:*
-• 🇵🇰 Pakistani numbers
-• 🌍 International numbers
-• ⚡ Fast response
-• 🎯 Accurate results
-
-💫 *Try it now!*`;
-      
-      return extra.reply(helpMsg);
+      return extra.reply(
+        `🔍 *NAME FINDER* 🔍\n\n` +
+        `📌 *.namefinder 03018787786*\n` +
+        `📌 *.namefinder 923018787786*\n\n` +
+        `✨ *Find anyone's name by number*`
+      );
     }
 
     let number = args[0];
     
-    // Clean the number
-    number = number.replace(/[^0-9]/g, '');
+    // Clean the number - remove all non-digits
+    number = number.replace(/\D/g, '');
     
-    // Remove leading 0 if present (for Pakistani numbers)
+    // If number starts with 0, replace with 92 (Pakistan)
     if (number.startsWith('0')) {
       number = '92' + number.substring(1);
     }
     
-    // Show searching animation
+    // If number doesn't have country code, add 92
+    if (number.length === 10 && !number.startsWith('92')) {
+      number = '92' + number;
+    }
+    
     await extra.react('🔍');
-    await extra.reply(`🔍 *Searching for +${number}...*`);
     
     try {
-      // Call your API
-      const response = await axios.get(`https://ammar-all-international-number-sim.vercel.app/${number}`, {
+      // Make API call
+      const apiUrl = `https://ammar-all-international-number-sim.vercel.app/${number}`;
+      console.log('Calling API:', apiUrl);
+      
+      const response = await axios.get(apiUrl, {
         timeout: 15000,
         headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Ammar-MD-Bot'
+          'Accept': 'application/json'
         }
       });
       
-      // Debug: Log the response to see what API returns
-      console.log('API Response:', response.data);
+      console.log('API Response:', JSON.stringify(response.data, null, 2));
       
-      // Extract name - Check all possible fields
+      // Extract name from response
       let name = 'Unknown';
       
+      // Check all possible fields in response
       if (response.data) {
-        // Try different possible field names
         if (response.data.name) name = response.data.name;
-        else if (response.data.caller_name) name = response.data.caller_name;
-        else if (response.data.owner) name = response.data.owner;
         else if (response.data.developer) name = response.data.developer;
-        else if (response.data.username) name = response.data.username;
-        else if (response.data.title) name = response.data.title;
+        else if (response.data.owner) name = response.data.owner;
+        else if (response.data.caller_name) name = response.data.caller_name;
+        else if (response.data.whatsapp) name = response.data.whatsapp;
         else if (typeof response.data === 'string') name = response.data;
-        else if (response.data.result && response.data.result.name) name = response.data.result.name;
-        else if (response.data.data && response.data.data.name) name = response.data.data.name;
-        
-        // If still unknown, show the whole response for debugging
-        if (name === 'Unknown') {
-          console.log('Full API Response:', JSON.stringify(response.data, null, 2));
-          // Try to get any string value from response
-          const firstValue = Object.values(response.data)[0];
-          if (firstValue && typeof firstValue === 'string') {
-            name = firstValue;
+        else {
+          // If response is an object, try to get first string value
+          const values = Object.values(response.data);
+          for (const val of values) {
+            if (typeof val === 'string' && val.length > 0) {
+              name = val;
+              break;
+            }
           }
         }
       }
       
-      // Stylish output with full data
-      const result = 
-`👤 *NAME FOUND* 👤
-
-━━━━━━━━━━━━━━━━━━━━━━
-📞 *Number:* +${number}
-🏷️ *Name:* ${name}
-━━━━━━━━━━━━━━━━━━━━━━
-
-📊 *Full API Response:*
-${JSON.stringify(response.data, null, 2)}
-
-✅ *Successfully retrieved!*`;
+      // Send response
+      await extra.reply(
+        `👤 *NAME FOUND* 👤\n\n` +
+        `📞 *Number:* +${number}\n` +
+        `🏷️ *Name:* ${name}\n\n` +
+        `✅ *Success!*`
+      );
       
-      await extra.reply(result);
       await extra.react('✅');
       
     } catch (error) {
-      console.error('API Error:', error.message);
+      console.error('Error details:', error.message);
       
-      let errorDetails = '';
+      let errorMessage = `❌ *ERROR*\n\n`;
+      errorMessage += `📞 *Number:* +${number}\n`;
+      
       if (error.response) {
-        errorDetails = `\n📡 *API Status:* ${error.response.status}\n📄 *Response:* ${JSON.stringify(error.response.data)}`;
+        errorMessage += `📡 *Status:* ${error.response.status}\n`;
+        errorMessage += `💬 *Message:* ${error.response.data || 'No data'}`;
       } else if (error.request) {
-        errorDetails = `\n🌐 *No response from API server*`;
+        errorMessage += `🌐 *Error:* No response from server\n`;
+        errorMessage += `🔌 *Check:* API might be down`;
       } else {
-        errorDetails = `\n⚠️ *Error:* ${error.message}`;
+        errorMessage += `⚠️ *Error:* ${error.message}`;
       }
       
-      const errorMsg = 
-`❌ *API ERROR* ❌
-
-━━━━━━━━━━━━━━━━━━━━━━
-📞 *Number:* +${number}
-⚠️ *Status:* Failed to fetch data
-${errorDetails}
-━━━━━━━━━━━━━━━━━━━━━━
-
-💡 *Tips:*
-• Check if API is working
-• Try visiting: https://ammar-all-international-number-sim.vercel.app/${number}
-• Contact API developer: Ammar Rai (923018787786)`;
+      errorMessage += `\n\n💡 *Try:* https://ammar-all-international-number-sim.vercel.app/${number}`;
       
-      await extra.reply(errorMsg);
+      await extra.reply(errorMessage);
       await extra.react('❌');
     }
   }
