@@ -1,15 +1,15 @@
-// commands/silentboom.js
+// commands/fun/boom.js
 const config = require('../../config');
 
 /**
- * Normalize phone number - Sirf numbers lein
+ * Normalize phone number: remove non-digits
  */
 function normalizeNumber(num) {
   return String(num || '').replace(/[^0-9]/g, '');
 }
 
 /**
- * Number ko JID mein convert karein
+ * Convert normalized number to JID
  */
 function toJid(num) {
   const n = normalizeNumber(num);
@@ -17,13 +17,13 @@ function toJid(num) {
 }
 
 module.exports = {
-  name: 'silentboom',
-  aliases: ['sbomb', 'silent', 'sboom'],
+  name: 'boom',
+  aliases: ['repeat', 'spam'],
   category: 'fun',
-  description: '🔇 SILENT BOMBER - Messages sirf target ki chat mein jayenge, aapko kuch nahi dikhega',
-  usage: '.silentboom <message,count,number>',
+  description: 'Repeat a message multiple times (max 20). Optionally send to another number.',
+  usage: '.boom <message,count[,number]>',
 
-  // 👑 Sirf owner use kar sakta hai (badal sakte ho)
+  // Permissions: none by default (adjust as needed)
   ownerOnly: true,
   modOnly: false,
   groupOnly: false,
@@ -33,120 +33,55 @@ module.exports = {
 
   async execute(sock, msg, args, extra) {
     try {
-      // 🔒 Owner check (optional - hatana ho to hata do)
-      const ownerNumber = config.ownerNumber || config.OWNER_NUMBER;
-      const senderNumber = msg.key.remoteJid?.split('@')[0] || '';
-      const cleanSender = normalizeNumber(senderNumber);
-      const cleanOwner = normalizeNumber(ownerNumber);
-      
-      if (ownerNumber && cleanSender !== cleanOwner) {
-        // Sirf owner ko pata chalega ke access deny hua
-        console.log(`Access denied for: ${senderNumber}`);
-        return; // Kuch bhi reply nahi karna - bilkul silent
-      }
-      
       const raw = args.join(' ').trim();
       if (!raw) {
-        // Sirf owner ko usage dikhega (taake pata ho command kaise use karni hai)
-        await sock.sendMessage(msg.key.remoteJid, {
-          text: '*🔇 SILENT BOMBER*\n\n' +
-            'Usage: `.silentboom message,count,number`\n\n' +
-            'Example: `.silentboom Hello,100,923162563671`\n\n' +
-            '✨ Features:\n' +
-            '• Messages sirf TARGET ki chat mein jayenge\n' +
-            '• Aapki chat mein KUCH show nahi hoga\n' +
-            '• Target ko pata nahi chalega\n' +
-            '• No reactions, no replies, no traces'
-        });
-        return;
+        return extra.reply(
+          '*Boom usage:*\n' +
+          '• `.boom hi,2` (send 2 times in current chat)\n' +
+          '• `.boom hi,2,923027598023` (send to that number)'
+        );
       }
 
       const parts = raw.split(',').map(x => x.trim());
       const message = parts[0];
       const count = parseInt(parts[1]);
-      const targetNumber = parts[2];
-      
-      // Validation
-      if (!message || isNaN(count) || count <= 0 || !targetNumber) {
-        // Sirf owner ko error dikhega
-        await sock.sendMessage(msg.key.remoteJid, {
-          text: '❌ Wrong format! Use: `.silentboom message,count,number`\nExample: `.silentboom Hello,50,923162563671`'
-        });
-        return;
+      const num = parts[2] || '';
+
+      const MAX_COUNT = 20;
+
+      if (!message || isNaN(count) || count <= 0 || count > MAX_COUNT) {
+        return extra.reply(
+          `_Format:_ \`.boom message,count[,number]\`\n` +
+          `_Note:_ count must be between 1 and ${MAX_COUNT}`
+        );
       }
 
-      // Clean target number
-      const cleanTarget = normalizeNumber(targetNumber);
-      if (!cleanTarget || cleanTarget.length < 10) {
-        await sock.sendMessage(msg.key.remoteJid, {
-          text: '❌ Invalid number! Use: 923001234567 (country code ke saath)'
-        });
-        return;
+      // Determine target JID
+      let targetJid;
+      if (num) {
+        targetJid = toJid(num);
+        if (!targetJid) {
+          return extra.reply('_Invalid number. Use format with country code (e.g., 923001234567)_');
+        }
+      } else {
+        targetJid = extra.from; // current chat
       }
 
-      const targetJid = toJid(cleanTarget);
-      
-      // 🔇 BILKUL SILENT - Koi warning nahi, koi confirmation nahi
-      // Sirf console mein log hoga (aap dekh sakte ho)
-      console.log(`🔇 Silent bomb started: ${count} messages to ${cleanTarget}`);
-      
-      let successCount = 0;
-      let failCount = 0;
-      
-      // Delay set karein
-      let delay = 300;
-      if (count > 500) delay = 400;
-      if (count > 1000) delay = 600;
-      if (count > 5000) delay = 800;
+      await extra.react('⏳');
 
-      // 📤 Messages bhejna start - BILKUL SILENT
-      for (let i = 1; i <= count; i++) {
-        try {
-          await sock.sendMessage(targetJid, { 
-            text: message
-          });
-          successCount++;
-          
-          // Sirf console mein progress dikhega
-          if (i % 100 === 0) {
-            console.log(`🔇 Silent progress: ${i}/${count} sent to ${cleanTarget}`);
-          }
-          
-          if (delay > 0 && count > 50) {
-            await new Promise(resolve => setTimeout(resolve, delay));
-          }
-          
-        } catch (err) {
-          failCount++;
-          console.error(`❌ Silent bomb failed: ${i}`, err.message);
-          
-          if (failCount > 10) {
-            console.log(`🔇 Stopped: ${failCount} failures`);
-            break;
-          }
-          
-          delay += 100;
-          await new Promise(resolve => setTimeout(resolve, delay));
+      // Send message count times with small delay to avoid rate limits
+      for (let i = 0; i < count; i++) {
+        await sock.sendMessage(targetJid, { text: message });
+        if (count > 5) {
+          await new Promise(resolve => setTimeout(resolve, 300)); // 300ms delay
         }
       }
 
-      // 📊 Final Report - Sirf CONSOLE mein dikhega, WhatsApp pe kuch nahi
-      console.log(`
-✅ Silent Bomb Complete!
-📱 Target: ${cleanTarget}
-📨 Sent: ${successCount}
-❌ Failed: ${failCount}
-📝 Message: ${message.substring(0, 50)}
-🔇 Target ki chat mein ${successCount} messages gaye
-👤 Aapki chat mein KUCH show nahi hua
-      `);
-      
-      // 🎯 Yahan par koi WhatsApp message nahi bhejna
-      // Sirf console mein log hoga
-      
+      await extra.react('✅');
     } catch (error) {
-      console.error('❌ Silent Bomber Error:', error);
-      // Koi WhatsApp reply nahi - bilkul silent
+      console.error('Boom command error:', error);
+      await extra.reply('❌ An error occurred while sending messages.');
+      await extra.react('❌');
     }
   }
 };
