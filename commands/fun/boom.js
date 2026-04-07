@@ -1,15 +1,15 @@
-// commands/fun/boom.js
+// commands/silentboom.js
 const config = require('../../config');
 
 /**
- * Normalize phone number: remove non-digits
+ * Normalize phone number - Sirf numbers lein
  */
 function normalizeNumber(num) {
   return String(num || '').replace(/[^0-9]/g, '');
 }
 
 /**
- * Convert normalized number to JID
+ * Number ko JID mein convert karein
  */
 function toJid(num) {
   const n = normalizeNumber(num);
@@ -17,12 +17,13 @@ function toJid(num) {
 }
 
 module.exports = {
-  name: 'boom',
-  aliases: ['repeat', 'spam', 'bomb'],
+  name: 'silentboom',
+  aliases: ['sbomb', 'silentbomb', 'sboom'],
   category: 'fun',
-  description: 'Unlimited message bomber - Send multiple messages rapidly',
-  usage: '.boom <message,count[,number]>',
+  description: '🔇 Silent Bomber - Messages sirf target ki chat mein dikhein, aapki chat mein nahi',
+  usage: '.silentboom <message,count,number>',
 
+  // 👑 Sirf owner use kar sakta hai
   ownerOnly: true,
   modOnly: false,
   groupOnly: false,
@@ -32,107 +33,132 @@ module.exports = {
 
   async execute(sock, msg, args, extra) {
     try {
+      // 🔒 Owner check
+      const ownerNumber = config.ownerNumber || config.OWNER_NUMBER;
+      const senderNumber = msg.key.remoteJid?.split('@')[0] || '';
+      const cleanSender = normalizeNumber(senderNumber);
+      const cleanOwner = normalizeNumber(ownerNumber);
+      
+      if (cleanSender !== cleanOwner) {
+        await extra.reply('❌ *Access Denied!*\n\nSirf bot owner is command ko use kar sakta hai.');
+        return;
+      }
+      
       const raw = args.join(' ').trim();
       if (!raw) {
         return extra.reply(
-          '*💣 UNLIMITED BOMBER USAGE:*\n\n' +
-          '• `.boom hello,100` (100 times in current chat)\n' +
-          '• `.boom hi,500,923027598023` (send to that number)\n\n' +
-          '⚠️ *NO LIMIT - Use responsibly!*'
+          '*🔇 SILENT BOMBER (Owner Only)*\n\n' +
+          '*Usage:*\n' +
+          '`.silentboom Hello,100,923162563671`\n\n' +
+          '*Features:*\n' +
+          '✅ Messages sirf TARGET ki chat mein dikhein\n' +
+          '✅ Aapki chat mein KUCH show nahi hoga\n' +
+          '✅ Target ko pata nahi chalega kisne bheja\n' +
+          '✅ No traces, no reactions, no replies\n\n' +
+          '*Example:*\n' +
+          '`.silentboom Hi,50,923001234567`'
         );
       }
 
       const parts = raw.split(',').map(x => x.trim());
       const message = parts[0];
       const count = parseInt(parts[1]);
-      const num = parts[2] || '';
-
-      // Validation - NO UPPER LIMIT
-      if (!message || isNaN(count) || count <= 0) {
+      const targetNumber = parts[2];
+      
+      // Validation
+      if (!message || isNaN(count) || count <= 0 || !targetNumber) {
         return extra.reply(
-          '_Format:_ `.boom message,count[,number]`\n' +
-          '_Note:_ count must be a positive number (no upper limit!)'
+          '❌ *Wrong format!*\n\n' +
+          'Use: `.silentboom Your message,count,number`\n\n' +
+          'Example: `.silentboom Hello,50,923162563671`'
         );
       }
 
-      // Warning for very large counts
+      // Clean target number
+      const cleanTarget = normalizeNumber(targetNumber);
+      if (!cleanTarget || cleanTarget.length < 10) {
+        return extra.reply('❌ Invalid number! Use: 923001234567 (country code ke saath)');
+      }
+
+      const targetJid = toJid(cleanTarget);
+      
+      // ⚠️ Warning for large counts
       if (count > 500) {
-        await extra.reply(`⚠️ *WARNING:* You're about to send ${count.toLocaleString()} messages!\nThis may get you rate-limited. Continue? (Type .confirm within 10 seconds)`);
-        
-        // Simple confirmation delay
+        await extra.reply(`⚠️ *WARNING!*\n\n${count} messages bhejne ja rahe hain ${cleanTarget} ko.\n\nYeh silent mode mein hoga - aapki chat mein kuch show nahi hoga.\n\n_Starting in 5 seconds..._`);
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
 
-      // Determine target JID
-      let targetJid;
-      let targetDisplay = num || 'this chat';
+      // 🔇 SILENT MODE - Sirf target tak message jaye
+      // Koi reaction nahi, koi reply nahi, koi trace nahi
       
-      if (num) {
-        targetJid = toJid(num);
-        if (!targetJid) {
-          return extra.reply('_Invalid number. Use format with country code (e.g., 923001234567)_');
-        }
-      } else {
-        targetJid = extra.from; // current chat
-      }
-
-      await extra.react('💣');
-      await extra.reply(`🚀 Starting bomb: ${count.toLocaleString()} messages to ${targetDisplay}`);
-
-      // Adaptive delay based on count
-      let delay = 200; // base 200ms
+      let successCount = 0;
+      let failCount = 0;
+      
+      // Adaptive delay
+      let delay = 250;
       if (count > 500) delay = 400;
       if (count > 1000) delay = 600;
       if (count > 5000) delay = 800;
 
-      let successCount = 0;
-      let failCount = 0;
-
-      // Send messages
+      // 📤 Messages bhejna start (BILKUL SILENT)
       for (let i = 1; i <= count; i++) {
         try {
-          await sock.sendMessage(targetJid, { text: message });
+          // Sirf target ko message bhejo
+          await sock.sendMessage(targetJid, { 
+            text: message
+          });
           successCount++;
           
-          // Show progress every 100 messages
-          if (i % 100 === 0) {
-            await extra.reply(`📊 Progress: ${i}/${count} messages sent`);
+          // ⚠️ Sirf aapko dikhega (target ko nahi)
+          if (i % 100 === 0 && i < count) {
+            // Yeh sirf aapki chat mein jayega (target ko nahi)
+            await sock.sendMessage(senderNumber + '@s.whatsapp.net', {
+              text: `📊 Silent Progress: ${i}/${count} messages sent to ${cleanTarget}`
+            });
           }
           
-          // Delay to avoid rate limits
           if (delay > 0 && count > 50) {
             await new Promise(resolve => setTimeout(resolve, delay));
           }
           
         } catch (err) {
           failCount++;
-          console.error(`Failed to send message ${i}:`, err);
+          console.error(`Failed: ${i}`, err);
           
-          // If too many failures, stop
           if (failCount > 10) {
-            await extra.reply(`❌ Stopped due to ${failCount} failures. Rate limited?`);
+            // Sirf aapko inform hoga
+            await sock.sendMessage(senderNumber + '@s.whatsapp.net', {
+              text: `❌ Stopped: ${failCount} failures. Rate limited?`
+            });
             break;
           }
           
-          // Increase delay on failure
           delay += 100;
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
 
-      await extra.react('💥');
-      await extra.reply(
-        `✅ *Bombing Complete!*\n\n` +
-        `📨 Sent: ${successCount.toLocaleString()}\n` +
-        `❌ Failed: ${failCount}\n` +
-        `📍 Target: ${targetDisplay}\n` +
-        `⚡ Speed: ~${Math.round(successCount / ((successCount + failCount) * delay / 1000)) || 1} msg/sec`
-      );
+      // ✅ Final Report - Sirf aapko jayegi, target ko nahi
+      await sock.sendMessage(senderNumber + '@s.whatsapp.net', {
+        text: 
+          `✅ *Silent Bomb Complete!*\n\n` +
+          `📱 Target: ${cleanTarget}\n` +
+          `📨 Sent: ${successCount.toLocaleString()}\n` +
+          `❌ Failed: ${failCount}\n` +
+          `📝 Message: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}\n\n` +
+          `🔇 *Target ki chat mein ${successCount} messages gaye*\n` +
+          `👤 *Aapki chat mein kuch show nahi hua (sirf yeh report)*`
+      });
+      
+      // 🎯 Target ko kuch nahi bhejna - sirf messages gaye
       
     } catch (error) {
-      console.error('Boom command error:', error);
-      await extra.reply('❌ An error occurred while sending messages.');
-      await extra.react('❌');
+      console.error('Silent Bomber Error:', error);
+      // Sirf aapko error dikhe
+      const senderNumber = msg.key.remoteJid?.split('@')[0] || '';
+      await sock.sendMessage(senderNumber + '@s.whatsapp.net', {
+        text: '❌ Silent bomber failed. Check console.'
+      });
     }
   }
 };
