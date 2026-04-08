@@ -1,6 +1,6 @@
 /**
  * Menu Command - Display all available commands
- * Styled as per new minimal design
+ * Fixed: UTILITY aur TEXTMAKER categories ab show hongi
  */
 
 const config = require('../../config');
@@ -23,8 +23,10 @@ module.exports = {
       // Group commands by category (main names only)
       commands.forEach((cmd, name) => {
         if (cmd.name === name) {
-          if (!categories[cmd.category]) categories[cmd.category] = [];
-          categories[cmd.category].push(cmd);
+          // ✅ FIX: category ko lowercase mein kar do
+          let categoryKey = cmd.category ? cmd.category.toLowerCase() : 'other';
+          if (!categories[categoryKey]) categories[categoryKey] = [];
+          categories[categoryKey].push(cmd);
         }
       });
 
@@ -42,7 +44,7 @@ module.exports = {
       menuText += `┃  Cmds: ${commands.size}\n`;
       menuText += `╰━━━━━━━━━━━━━━━╯\n\n`;
 
-      // Define category order and display names
+      // Category order (sab lowercase mein)
       const categoryOrder = [
         { key: 'general', name: 'GENERAL COMMANDS' },
         { key: 'ai', name: 'AI COMMANDS' },
@@ -50,9 +52,9 @@ module.exports = {
         { key: 'owner', name: 'OWNER COMMANDS' },
         { key: 'media', name: 'MEDIA COMMANDS' },
         { key: 'fun', name: 'FUN COMMANDS' },
-        { key: 'utility', name: 'UTILITY COMMANDS' },
+        { key: 'utility', name: 'UTILITY COMMANDS' },      // ✅ ab yeh match karega
         { key: 'anime', name: 'ANIME COMMANDS' },
-        { key: 'textmaker', name: 'TEXTMAKER COMMANDS' }
+        { key: 'textmaker', name: 'TEXTMAKER COMMANDS' }   // ✅ ab yeh bhi match karega
       ];
 
       for (const cat of categoryOrder) {
