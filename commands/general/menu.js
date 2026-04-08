@@ -1,6 +1,7 @@
 /**
- * Menu Command - Display all available commands
- * Fixed: UTILITY aur TEXTMAKER categories ab show hongi
+ * Menu Command - Auto-adjust borders for WhatsApp
+ * No complex alignment, simple lines that wrap correctly
+ * Automatically shows ALL categories including UTILITY and TEXTMAKER
  */
 
 const config = require('../../config');
@@ -20,74 +21,89 @@ module.exports = {
       const commands = loadCommands();
       const categories = {};
 
-      // Group commands by category (main names only)
+      // Group commands by category (normalize to lowercase)
       commands.forEach((cmd, name) => {
         if (cmd.name === name) {
-          // ✅ FIX: category ko lowercase mein kar do
-          let categoryKey = cmd.category ? cmd.category.toLowerCase() : 'other';
-          if (!categories[categoryKey]) categories[categoryKey] = [];
-          categories[categoryKey].push(cmd);
+          let cat = cmd.category ? cmd.category.toLowerCase().trim() : 'other';
+          if (!categories[cat]) categories[cat] = [];
+          categories[cat].push(cmd);
         }
       });
 
-      // Get owner name and bot name
+      // Debug: Console mein dekhein kaunsi categories mili
+      console.log('\n========== MENU CATEGORIES ==========');
+      for (const [cat, cmds] of Object.entries(categories)) {
+        console.log(`- ${cat} : ${cmds.length} commands`);
+      }
+      console.log('=====================================\n');
+
+      // Owner & Bot Info
       const ownerNames = Array.isArray(config.ownerName) ? config.ownerName : [config.ownerName];
       const displayOwner = ownerNames[0] || 'Bot Owner';
       const botName = config.botName || 'AMMAR-MD-BOT';
       const userTag = extra.sender.split('@')[0];
+      const prefix = config.prefix || '.';
 
-      // Build header
-      let menuText = `╭━  ${botName}  ━╮\n`;
-      menuText += `┃  Owner: ${displayOwner}\n`;
-      menuText += `┃  User: @${userTag}\n`;
-      menuText += `┃  Prefix: ${config.prefix}\n`;
-      menuText += `┃  Cmds: ${commands.size}\n`;
-      menuText += `╰━━━━━━━━━━━━━━━╯\n\n`;
+      // Simple header (no complex borders, just lines)
+      let menuText = `┌─────────────────────────────────────┐\n`;
+      menuText += `│           ${botName}           │\n`;
+      menuText += `├─────────────────────────────────────┤\n`;
+      menuText += `│ Owner   : ${displayOwner}\n`;
+      menuText += `│ User    : @${userTag}\n`;
+      menuText += `│ Prefix  : ${prefix}\n`;
+      menuText += `│ Commands: ${commands.size}\n`;
+      menuText += `└─────────────────────────────────────┘\n\n`;
 
-      // Category order (sab lowercase mein)
-      const categoryOrder = [
-        { key: 'general', name: 'GENERAL COMMANDS' },
-        { key: 'ai', name: 'AI COMMANDS' },
-        { key: 'group', name: 'GROUP COMMANDS' },
-        { key: 'owner', name: 'OWNER COMMANDS' },
-        { key: 'media', name: 'MEDIA COMMANDS' },
-        { key: 'fun', name: 'FUN COMMANDS' },
-        { key: 'utility', name: 'UTILITY COMMANDS' },      // ✅ ab yeh match karega
-        { key: 'anime', name: 'ANIME COMMANDS' },
-        { key: 'textmaker', name: 'TEXTMAKER COMMANDS' }   // ✅ ab yeh bhi match karega
+      // Define preferred order for categories (but all will show)
+      const preferredOrder = [
+        'general', 'ai', 'group', 'owner', 'media', 'fun',
+        'utility', 'anime', 'textmaker', 'download', 'tools', 'other'
       ];
 
-      for (const cat of categoryOrder) {
-        const cmdList = categories[cat.key];
-        if (cmdList && cmdList.length) {
-          menuText += `╭─❖ ${cat.name} \n│ \n`;
+      // First show categories in preferred order
+      const shownCategories = new Set();
+      for (const cat of preferredOrder) {
+        if (categories[cat] && categories[cat].length > 0) {
+          shownCategories.add(cat);
+          menuText += `┌────[ ${cat.toUpperCase()} COMMANDS ]────┐\n`;
+          menuText += `│\n`;
+          const cmdList = categories[cat];
+          // Show commands in simple list
           cmdList.forEach(cmd => {
-            menuText += `│ -   ${config.prefix}${cmd.name}\n`;
+            menuText += `│ • ${prefix}${cmd.name}\n`;
           });
-          menuText += `╰──────────────\n\n`;
+          menuText += `│\n`;
+          menuText += `└─────────────────────────────────────┘\n\n`;
         }
       }
 
-      menuText += `💡 Type ${config.prefix}help <command> for more info\n`;
-      menuText += `🌟 Bot Version: ${config.version || '1.0.0'}\n`;
+      // Then show any remaining categories not in preferred order
+      for (const cat in categories) {
+        if (!shownCategories.has(cat) && categories[cat].length > 0) {
+          menuText += `┌────[ ${cat.toUpperCase()} COMMANDS ]────┐\n`;
+          menuText += `│\n`;
+          categories[cat].forEach(cmd => {
+            menuText += `│ • ${prefix}${cmd.name}\n`;
+          });
+          menuText += `│\n`;
+          menuText += `└─────────────────────────────────────┘\n\n`;
+        }
+      }
 
-      // Send with image if available
+      // Footer
+      menuText += `┌─────────────────────────────────────┐\n`;
+      menuText += `│ 💡 Type ${prefix}help <command> for details │\n`;
+      menuText += `│ 📱 Version: ${config.version || '1.0.0'}                │\n`;
+      menuText += `└─────────────────────────────────────┘`;
+
+      // Send message
       const imagePath = path.join(__dirname, '../../utils/bot_image.jpg');
       if (fs.existsSync(imagePath)) {
         const imageBuffer = fs.readFileSync(imagePath);
         await sock.sendMessage(extra.from, {
           image: imageBuffer,
           caption: menuText,
-          mentions: [extra.sender],
-          contextInfo: {
-            forwardingScore: 1,
-            isForwarded: true,
-            forwardedNewsletterMessageInfo: {
-              newsletterJid: config.newsletterJid || '120363405564344038@newsletter',
-              newsletterName: botName,
-              serverMessageId: -1
-            }
-          }
+          mentions: [extra.sender]
         }, { quoted: msg });
       } else {
         await sock.sendMessage(extra.from, {
