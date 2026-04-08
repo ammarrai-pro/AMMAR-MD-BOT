@@ -1,120 +1,346 @@
 /**
- * Menu Command - Auto-adjust borders for WhatsApp
- * No complex alignment, simple lines that wrap correctly
- * Automatically shows ALL categories including UTILITY and TEXTMAKER
+
+ * Menu Command - Display all available commands
+
  */
 
 const config = require('../../config');
+
 const { loadCommands } = require('../../utils/commandLoader');
-const fs = require('fs');
-const path = require('path');
+const ui = require('../../utils/ui');
 
 module.exports = {
+
   name: 'menu',
+
   aliases: ['help', 'commands'],
+
   category: 'general',
+
   description: 'Show all available commands',
+
   usage: '.menu',
 
+  
+
   async execute(sock, msg, args, extra) {
+
     try {
+
       const commands = loadCommands();
+
       const categories = {};
 
-      // Group commands by category (normalize to lowercase)
+      
+
+      // Group commands by category
+
       commands.forEach((cmd, name) => {
-        if (cmd.name === name) {
-          let cat = cmd.category ? cmd.category.toLowerCase().trim() : 'other';
-          if (!categories[cat]) categories[cat] = [];
-          categories[cat].push(cmd);
+
+        if (cmd.name === name) { // Only count main command names, not aliases
+
+          if (!categories[cmd.category]) {
+
+            categories[cmd.category] = [];
+
+          }
+
+          categories[cmd.category].push(cmd);
+
         }
+
       });
 
-      // Debug: Console mein dekhein kaunsi categories mili
-      console.log('\n========== MENU CATEGORIES ==========');
-      for (const [cat, cmds] of Object.entries(categories)) {
-        console.log(`- ${cat} : ${cmds.length} commands`);
-      }
-      console.log('=====================================\n');
+      
 
-      // Owner & Bot Info
       const ownerNames = Array.isArray(config.ownerName) ? config.ownerName : [config.ownerName];
-      const displayOwner = ownerNames[0] || 'Bot Owner';
-      const botName = config.botName || 'AMMAR-MD-BOT';
-      const userTag = extra.sender.split('@')[0];
-      const prefix = config.prefix || '.';
 
-      // Simple header (no complex borders, just lines)
-      let menuText = `┌─────────────────────────────────────┐\n`;
-      menuText += `│           ${botName}           │\n`;
-      menuText += `├─────────────────────────────────────┤\n`;
-      menuText += `│ Owner   : ${displayOwner}\n`;
-      menuText += `│ User    : @${userTag}\n`;
-      menuText += `│ Prefix  : ${prefix}\n`;
-      menuText += `│ Commands: ${commands.size}\n`;
-      menuText += `└─────────────────────────────────────┘\n\n`;
+      const displayOwner = ownerNames[0] || config.ownerName || 'Bot Owner';
 
-      // Define preferred order for categories (but all will show)
-      const preferredOrder = [
-        'general', 'ai', 'group', 'owner', 'media', 'fun',
-        'utility', 'anime', 'textmaker', 'download', 'tools', 'other'
-      ];
+      // menu configurtion from proboy
 
-      // First show categories in preferred order
-      const shownCategories = new Set();
-      for (const cat of preferredOrder) {
-        if (categories[cat] && categories[cat].length > 0) {
-          shownCategories.add(cat);
-          menuText += `┌────[ ${cat.toUpperCase()} COMMANDS ]────┐\n`;
-          menuText += `│\n`;
-          const cmdList = categories[cat];
-          // Show commands in simple list
-          cmdList.forEach(cmd => {
-            menuText += `│ • ${prefix}${cmd.name}\n`;
-          });
-          menuText += `│\n`;
-          menuText += `└─────────────────────────────────────┘\n\n`;
-        }
+      let menuText = `${ui.headerLine('Menu')}\n\n`;
+      menuText += `👑 Owner: ${displayOwner}\n`;
+      menuText += `👤 User: @${extra.sender.split('@')[0]}\n`;
+      menuText += `⚡ Prefix: ${config.prefix}\n`;
+      menuText += `🧩 Commands: ${commands.size}\n\n`;
+
+     
+
+        
+
+      // General Commands
+
+      if (categories.general) {
+
+        menuText += `╭════〘 _GENERAL COMMANDS_ 〙════⊷❍\n`;
+
+        categories.general.forEach(cmd => {
+
+          menuText += `┃✯│  _${config.prefix}${cmd.name}_\n`;
+
+        });
+
+        menuText += `┃✯╰─────────────────❍\n`;
+
+        menuText += `╰══════════════════⊷❍\n`;  
+
+        menuText += `\n`;
+
       }
 
-      // Then show any remaining categories not in preferred order
-      for (const cat in categories) {
-        if (!shownCategories.has(cat) && categories[cat].length > 0) {
-          menuText += `┌────[ ${cat.toUpperCase()} COMMANDS ]────┐\n`;
-          menuText += `│\n`;
-          categories[cat].forEach(cmd => {
-            menuText += `│ • ${prefix}${cmd.name}\n`;
-          });
-          menuText += `│\n`;
-          menuText += `└─────────────────────────────────────┘\n\n`;
-        }
+        
+
+      
+
+      // AI Commands
+
+      if (categories.ai) {
+
+        menuText += `╭════〘 _AI COMMANDS_ 〙════⊷❍\n`;
+
+        categories.ai.forEach(cmd => {
+
+          menuText += `┃✯│  _${config.prefix}${cmd.name}_\n`;
+
+        });
+
+        menuText += `┃✯╰─────────────────❍\n`;
+
+        menuText += `╰══════════════════⊷❍\n`;  
+
+        menuText += `\n`;
+
       }
 
-      // Footer
-      menuText += `┌─────────────────────────────────────┐\n`;
-      menuText += `│ 💡 Type ${prefix}help <command> for details │\n`;
-      menuText += `│ 📱 Version: ${config.version || '1.0.0'}                │\n`;
-      menuText += `└─────────────────────────────────────┘`;
+      
 
-      // Send message
+      // Group Commands
+
+      if (categories.group) {
+
+        menuText += `╭════〘 _GROUP COMMANDS_ 〙════⊷❍\n`;
+
+        categories.group.forEach(cmd => {
+
+           menuText += `┃✯│  _${config.prefix}${cmd.name}_\n`;
+
+        });
+
+         menuText += `┃✯╰─────────────────❍\n`;
+
+        menuText += `╰══════════════════⊷❍\n`;  
+
+        menuText += `\n`;
+
+      }
+
+      
+
+      
+
+      // Owner Commands
+
+      if (categories.owner) {
+
+		menuText += `╭════〘 _OWNER COMMANDS_ 〙════⊷❍\n`;
+
+        categories.owner.forEach(cmd => {
+
+          menuText += `┃✯│  _${config.prefix}${cmd.name}_\n`;
+
+        });
+
+        menuText += `┃✯╰─────────────────❍\n`;
+
+		menuText += `╰══════════════════⊷❍\n`;  
+
+		menuText += `\n`;
+
+      }
+
+      
+
+      // Media Commands
+
+      if (categories.media) {
+
+        menuText += `╭════〘 _MEDIA COMMANDS_ 〙════⊷❍\n`;
+
+        categories.media.forEach(cmd => {
+
+          menuText += `┃✯│  _${config.prefix}${cmd.name}_\n`;
+
+        });
+
+        menuText += `┃✯╰─────────────────❍\n`;
+
+menuText += `╰══════════════════⊷❍\n`;  
+
+menuText += `\n`;
+
+      }
+
+      
+
+      // Fun Commands
+
+      if (categories.fun) {
+
+        menuText += `╭════〘 _FUN COMMANDS_ 〙════⊷❍\n`;
+
+        categories.fun.forEach(cmd => {
+
+          menuText += `┃✯│  _${config.prefix}${cmd.name}_\n`;
+
+        });
+
+        menuText += `┃✯╰─────────────────❍\n`;
+
+menuText += `╰══════════════════⊷❍\n`;  
+
+menuText += `\n`;
+
+      }
+
+      
+
+      // Utility Commands
+
+      if (categories.utility) {
+
+		menuText += `╭════〘 _Utility COMMANDS_ 〙════⊷❍\n`;
+
+        categories.utility.forEach(cmd => {
+
+          menuText += `┃✯│   _${config.prefix}${cmd.name}_\n`;
+
+        });
+
+        menuText += `┃✯╰─────────────────❍\n`;
+
+menuText += `╰══════════════════⊷❍\n`;  
+
+menuText += `\n`;
+
+      }
+
+       // Anime Commands
+
+       if (categories.anime) {
+
+			menuText += `╭════〘 _Anime COMMANDS_ 〙════⊷❍\n`;
+
+        categories.anime.forEach(cmd => {
+
+          menuText += `┃✯│  _${config.prefix}${cmd.name}_\n`;
+
+        });
+
+        menuText += `┃✯╰─────────────────❍\n`;
+
+menuText += `╰══════════════════⊷❍\n`;  
+
+menuText += `\n`;
+
+      
+
+      }
+
+       // Textmaker Commands
+
+       if (categories.utility) {
+
+        menuText += `╭════〘 _Textmaker COMMANDS_ 〙════⊷❍\n`;
+
+        categories.textmaker.forEach(cmd => {
+
+          menuText += `┃✯│  _${config.prefix}${cmd.name}_\n`;
+
+        });
+
+        menuText += `┃✯╰─────────────────❍\n`;
+
+menuText += `╰══════════════════⊷❍\n`;  
+
+menuText += `\n`;
+
+      }
+
+      
+
+      menuText += `╰━━━━━━━━━━━━━━━━━\n\n`;
+
+      menuText += `💡 Type ${config.prefix}help <command> for more info\n`;
+
+      menuText += `🌟 Bot Version: ${config.version || '1.0.0'}\n`;
+
+      
+
+      // Send menu with image
+
+      const fs = require('fs');
+
+      const path = require('path');
+
       const imagePath = path.join(__dirname, '../../utils/bot_image.jpg');
+
+      
+
       if (fs.existsSync(imagePath)) {
+
+        // Send image with newsletter forwarding context
+
         const imageBuffer = fs.readFileSync(imagePath);
+
         await sock.sendMessage(extra.from, {
+
           image: imageBuffer,
+
           caption: menuText,
-          mentions: [extra.sender]
+
+          mentions: [extra.sender],
+
+          contextInfo: {
+
+            forwardingScore: 1,
+
+            isForwarded: true,
+
+            forwardedNewsletterMessageInfo: {
+
+              newsletterJid: config.newsletterJid || '120363405564344038@newsletter',
+
+              newsletterName: config.botName,
+
+              serverMessageId: -1
+
+            }
+
+          }
+
         }, { quoted: msg });
+
       } else {
+
         await sock.sendMessage(extra.from, {
+
           text: menuText,
+
           mentions: [extra.sender]
+
         }, { quoted: msg });
+
       }
+
+      
 
     } catch (error) {
-      console.error('Menu error:', error);
+
       await extra.reply(`❌ Error: ${error.message}`);
+
     }
+
   }
+
 };
