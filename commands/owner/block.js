@@ -1,5 +1,5 @@
 /**
- * Block Command - Block a user (FIXED)
+ * Block Command - Fixed "bad-request" error
  */
 
 module.exports = {
@@ -33,15 +33,24 @@ module.exports = {
       
       // Method 4: Check if phone number provided in args
       if (!target && args[0]) {
-        const phoneMatch = args[0].match(/(\d+)/);
-        if (phoneMatch) {
-          target = `${phoneMatch[0]}@s.whatsapp.net`;
+        // Clean the phone number
+        let phone = args[0].replace(/[^0-9]/g, '');
+        if (phone.length === 10) {
+          phone = '92' + phone; // Pakistan code
+        }
+        if (phone.length >= 10) {
+          target = `${phone}@s.whatsapp.net`;
         }
       }
       
       // If no target found
       if (!target) {
         return extra.reply(`❌ *Usage:* ${this.usage}\n\n📝 *Examples:*\n.block @user\n.block 9234567890\nReply to a message and type .block`);
+      }
+      
+      // Validate JID format
+      if (!target.includes('@') || !target.endsWith('s.whatsapp.net')) {
+        return extra.reply(`❌ Invalid user format. Use: .block 9234567890 or .block @user`);
       }
       
       // Prevent blocking self
@@ -51,26 +60,47 @@ module.exports = {
       }
       
       // Prevent blocking owner
-      const isOwner = extra.config.ownerNumber.some(owner => 
-        target.includes(owner) || target === `${owner}@s.whatsapp.net`
-      );
+      const isOwner = extra.config.ownerNumber.some(owner => {
+        const ownerJid = owner.includes('@') ? owner : `${owner}@s.whatsapp.net`;
+        return target === ownerJid;
+      });
       
       if (isOwner) {
         return extra.reply(`❌ Cannot block the bot owner! 👑`);
       }
       
-      // Check if already blocked
+      await extra.react('⏳');
+      
+      // FIX: Check if user exists first
       try {
-        const blockList = await sock.fetchBlocklist();
-        if (blockList && blockList.includes(target)) {
-          return extra.reply(`ℹ️ User @${target.split('@')[0]} is already blocked!`, { mentions: [target] });
+        // Try to get user presence to verify existence
+        const presence = await sock.presenceSubscribe(target);
+        if (!presence) {
+          // User might not exist, but continue anyway
+          console.log('User may not exist:', target);
         }
       } catch (e) {
-        // Ignore fetch error
+        console.log('Presence check failed:', e.message);
       }
       
-      // Block the user
-      await sock.updateBlockStatus(target, 'block');
+      // FIX: Use try-catch with specific error handling for block
+      try {
+        await sock.updateBlockStatus(target, 'block');
+      } catch (blockError) {
+        // Handle specific block errors
+        if (blockError.message.includes('bad-request')) {
+          // Alternative method: Send a message then block
+          try {
+            await sock.sendMessage(target, { text: 'You have been blocked from using this bot.' });
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await sock.updateBlockStatus(target, 'block');
+          } catch (retryError) {
+            throw new Error('Cannot block user. User may have privacy settings enabled.');
+          }
+        } else {
+          throw blockError;
+        }
+      }
       
       // Send success message
       const successMsg = `✅ *USER BLOCKED* ✅\n\n` +
@@ -84,29 +114,22 @@ module.exports = {
         mentions: [target]
       });
       
-      // Try to notify the blocked user
-      try {
-        await sock.sendMessage(target, {
-          text: `🚫 *ＢＬＯＣＫＥＤ* 🚫\n\nYou have been blocked by ${extra.config.botName} owner.\n\nReason: Violation of bot policies.\n\nContact: ${extra.config.ownerNumber[0]}`
-        });
-      } catch (e) {
-        // User might already be blocked or doesn't exist
-        console.log('Could not notify blocked user');
-      }
-      
       await extra.react('🚫');
       
     } catch (error) {
       console.error('Block error:', error);
       
-      // Handle specific errors
-      if (error.message.includes('405')) {
-        await extra.reply(`❌ Cannot block user. WhatsApp might have rate limits. Try again later.`);
+      // User-friendly error messages
+      if (error.message.includes('bad-request')) {
+        await extra.reply(`❌ Cannot block user.\n\nPossible reasons:\n• User has privacy settings enabled\n• User doesn't exist\n• Invalid phone number\n\nTry: .block @user (mention them directly)`);
+      } else if (error.message.includes('405')) {
+        await extra.reply(`❌ Rate limited. Please wait a few seconds and try again.`);
       } else if (error.message.includes('403')) {
-        await extra.reply(`❌ Permission denied. Make sure bot has proper authentication.`);
+        await extra.reply(`❌ Permission denied. Bot may need to be re-authenticated.`);
       } else {
         await extra.reply(`❌ Error: ${error.message}`);
       }
+      await extra.react('❌');
     }
   }
 };
