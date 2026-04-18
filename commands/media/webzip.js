@@ -1,11 +1,13 @@
 // commands/media/webzip.js
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 module.exports = {
   name: 'webzip',
   aliases: ['wzip', 'webtozip', 'saveweb'],
   category: 'media',
-  description: 'Convert any website to ZIP file',
+  description: 'Convert any website to ZIP file and send directly',
   usage: '.webzip <website-url>',
 
   async execute(sock, msg, args, extra) {
@@ -26,7 +28,7 @@ module.exports = {
       await extra.react('⏳');
       await extra.reply(`🔄 Converting website to ZIP...\n\n🌐 URL: ${targetUrl}\n⏱️ Please wait.`);
 
-      // Call the API
+      // Call the API to get download URL
       const apiUrl = `https://ammar-web-to-zip-api.vercel.app/zip?url=${encodeURIComponent(targetUrl)}`;
       
       const response = await axios.get(apiUrl, {
@@ -39,15 +41,53 @@ module.exports = {
       }
 
       const result = response.data.result;
+      const downloadUrl = result.download_url;
+      const domain = result.domain;
 
-      // Send success message with download link
-      const successMessage = `✅ *Website Converted Successfully!*\n\n` +
-        `🌐 *Domain:* ${result.domain}\n` +
-        `⏱️ *Time Taken:* ${result.time_taken}\n\n` +
-        `📥 *Download ZIP:*\n${result.download_url}\n\n` +
-        `💡 Click the link above to download your ZIP file.`;
+      // Send status update
+      await extra.reply(`📥 Downloading ZIP file for ${domain}...\n⏱️ This may take a moment.`);
 
-      await extra.reply(successMessage);
+      // Download the ZIP file
+      const zipResponse = await axios({
+        method: 'get',
+        url: downloadUrl,
+        responseType: 'stream',
+        timeout: 60000
+      });
+
+      // Create temp directory if it doesn't exist
+      const tempDir = path.join(__dirname, '../../temp');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
+      // Save ZIP file temporarily
+      const tempFilePath = path.join(tempDir, `${domain}_${Date.now()}.zip`);
+      const writer = fs.createWriteStream(tempFilePath);
+      
+      zipResponse.data.pipe(writer);
+
+      // Wait for download to complete
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+      });
+
+      // Get file size
+      const stats = fs.statSync(tempFilePath);
+      const fileSizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
+
+      // Send ZIP file directly to WhatsApp
+      await sock.sendMessage(extra.from, {
+        document: fs.readFileSync(tempFilePath),
+        mimetype: 'application/zip',
+        fileName: `${domain}.zip`,
+        caption: `✅ *Website Converted Successfully!*\n\n🌐 *Domain:* ${domain}\n📦 *File Size:* ${fileSizeInMB} MB\n⏱️ *Time Taken:* ${result.time_taken}\n\n📂 ZIP file contains the complete website.`
+      }, { quoted: msg });
+
+      // Delete temp file
+      fs.unlinkSync(tempFilePath);
+      
       await extra.react('✅');
 
     } catch (error) {
@@ -56,11 +96,11 @@ module.exports = {
       let errorMessage = '❌ *Failed to convert website!*\n\n';
       
       if (error.code === 'ECONNABORTED') {
-        errorMessage += '⏰ Timeout: Website took too long.';
+        errorMessage += '⏰ Timeout: Website took too long to respond.';
       } else if (error.response) {
-        errorMessage += `📡 API Error: ${error.response.status}`;
+        errorMessage += `📡 API Error: ${error.response.status}\nThe website might be inaccessible.`;
       } else if (error.request) {
-        errorMessage += '🌐 Network Error: Cannot reach service.';
+        errorMessage += '🌐 Network Error: Cannot reach conversion service.';
       } else {
         errorMessage += `⚠️ Error: ${error.message}`;
       }
@@ -69,6 +109,11 @@ module.exports = {
       
       await extra.reply(errorMessage);
       await extra.react('❌');
+      
+      // Clean up temp file if it exists
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath);
+      }
     }
   }
 };
