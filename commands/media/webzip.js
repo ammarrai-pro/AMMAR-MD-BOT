@@ -26,9 +26,8 @@ module.exports = {
         targetUrl = 'https://' + targetUrl;
       }
 
-      // Send initial loading message
+      // Show loading reaction only
       await extra.react('⏳');
-      const statusMsg = await extra.reply(`🔄 Processing...\n\n👨‍💻 Developer By Ammar Rai`);
 
       // Call the API to get download URL
       const apiUrl = `https://ammar-web-to-zip-api.vercel.app/zip?url=${encodeURIComponent(targetUrl)}`;
@@ -75,9 +74,6 @@ module.exports = {
       // Get file size
       const stats = fs.statSync(tempFilePath);
       const fileSizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
-
-      // Delete the status message
-      await sock.sendMessage(extra.from, { delete: statusMsg.key });
 
       // Send ONE message with ZIP file + all info + developer name
       await sock.sendMessage(extra.from, {
