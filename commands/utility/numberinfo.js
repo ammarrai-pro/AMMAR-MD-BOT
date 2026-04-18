@@ -66,41 +66,21 @@ Please enter a valid number.
       }
 
       const result = response.data.SEARCH_RESULT;
-      const name = (result.full_name || 'N/A').trim();
+      const name = result.full_name || 'N/A';
       const number = result.phone_number || phoneNumber;
 
-      // Auto box design function
-      function makeBox(title, content) {
-        const boxWidth = 23;
-        const topLine = '┌' + '─'.repeat(boxWidth) + '┐';
-        const titleLine = '│  ' + title + ' '.repeat(boxWidth - title.length - 2) + '│';
-        const midLine = '├' + '─'.repeat(boxWidth) + '┤';
-        const contentLine = '│  ' + content + ' '.repeat(boxWidth - content.length - 2) + '│';
-        const bottomLine = '└' + '─'.repeat(boxWidth) + '┘';
-        return `${topLine}\n${titleLine}\n${midLine}\n${contentLine}\n${bottomLine}`;
-      }
+      // Auto-adjust lines for WhatsApp
+      const infoMessage = `📱 NUMBER INFORMATION
 
-      // Auto adjust based on name length
-      const nameDisplay = name.length > 19 ? name.substring(0, 16) + '...' : name;
-      const numberDisplay = number.length > 19 ? number : number;
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-      // Fixed box design (properly aligned)
-      const infoMessage = `┌─────────────────────┐
-│  📱 SIM DATABASE    │
-└─────────────────────┘
+👤 NAME: ${name}
 
-┌─────────────────────┐
-│  👤 OWNER NAME      │
-│  ${nameDisplay.padEnd(19)}│
-├─────────────────────┤
-│  📞 PHONE NUMBER    │
-│  ${numberDisplay.padEnd(19)}│
-└─────────────────────┘
+📞 NUMBER: ${number}
 
-┌─────────────────────┐
-│  👨‍💻 DEVELOPER     │
-│  AMMAR RAI          │
-└─────────────────────┘`;
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+👨‍💻 DEVELOPER BY AMMAR RAI`;
 
       // Send the information
       await extra.reply(infoMessage);
@@ -109,20 +89,17 @@ Please enter a valid number.
     } catch (error) {
       console.error('Number Info Error:', error);
       
-      const errorMessage = `┌─────────────────────┐
-│  ❌ ERROR          │
-└─────────────────────┘
+      const errorMessage = `❌ FAILED TO GET NUMBER INFO
 
-┌─────────────────────┐
-│  ⚠️ ${error.response ? 'NUMBER NOT FOUND' : error.code === 'ECONNABORTED' ? 'SERVER TIMEOUT' : 'NETWORK ERROR'.padEnd(19)} │
-└─────────────────────┘
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-┌─────────────────────┐
-│  📝 .numberinfo    │
-│  923001234567      │
-└─────────────────────┘
+⚠️ ${error.response ? 'Number not found in database.' : error.code === 'ECONNABORTED' ? 'Server timeout. Please try again.' : 'Network error. Check your connection.'}
 
-👨‍💻 Developer By Ammar Rai`;
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 Usage: .numberinfo 923001234567
+
+👨‍💻 DEVELOPER BY AMMAR RAI`;
       
       await extra.reply(errorMessage);
       await extra.react('❌');
