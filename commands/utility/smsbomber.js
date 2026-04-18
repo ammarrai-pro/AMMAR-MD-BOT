@@ -29,10 +29,10 @@ module.exports = {
       let count = parseInt(args[1]);
 
       // Validate count
-      if (isNaN(count) || count < 1 || count > 100) {
+      if (isNaN(count) || count < 1 || count > 50) {
         return extra.reply(`❌ Invalid count!
 
-Count must be between 1 and 100.
+Count must be between 1 and 50.
 
 📝 Example: .smsbomber 923001234567 10
 
@@ -62,14 +62,20 @@ Use format: 923001234567 (12 digits starting with 92)
 
       // Show loading
       await extra.react('⏳');
-      await extra.reply(`📱 Sending ${count} SMS to ${phoneNumber}...`);
+      const statusMsg = await extra.reply(`📱 Sending ${count} SMS to ${phoneNumber}...\n⏱️ Please wait.`);
 
-      // Call API
+      // Call API with increased timeout
       const apiUrl = `https://rai-ammar-sms-bomber-api.vercel.app/?number=${phoneNumber}&count=${count}`;
       
       const response = await axios.get(apiUrl, {
-        timeout: 30000
+        timeout: 60000, // Increased to 60 seconds
+        headers: {
+          'User-Agent': 'ProBoy-MD-Bot/1.0'
+        }
       });
+
+      // Delete status message
+      await sock.sendMessage(extra.from, { delete: statusMsg.key });
 
       // Check response
       if (!response.data || response.data.Target_Details.Status !== 'Success') {
@@ -81,7 +87,7 @@ Use format: 923001234567 (12 digits starting with 92)
       const developer = response.data.Developer_Credits;
       const time = response.data.Timestamp;
 
-      // Success message (only one developer credit at bottom)
+      // Success message
       const resultMessage = `✅ SMS BOMBING COMPLETED
 
 📞 Target: ${target.Input_Number}
@@ -101,9 +107,23 @@ Use format: 923001234567 (12 digits starting with 92)
     } catch (error) {
       console.error('SMS Bomber Error:', error);
       
+      let errorMsg = '';
+      
+      if (error.code === 'ECONNABORTED') {
+        errorMsg = 'Server is busy! Try with smaller count (5-10 SMS).';
+      } else if (error.response) {
+        errorMsg = 'API error! Please try again.';
+      } else if (error.request) {
+        errorMsg = 'Network error! Check your connection.';
+      } else {
+        errorMsg = error.message || 'Unknown error! Try again.';
+      }
+      
       const errorMessage = `❌ SMS BOMBING FAILED
 
-⚠️ ${error.response ? 'API error! Try again.' : error.code === 'ECONNABORTED' ? 'Server timeout! Try again.' : 'Network error! Check connection.'}
+⚠️ ${errorMsg}
+
+💡 Tip: Try with fewer SMS (5-10) or wait a few minutes.
 
 📝 Usage: .smsbomber 923001234567 10
 
