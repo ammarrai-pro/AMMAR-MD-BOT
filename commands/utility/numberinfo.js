@@ -14,7 +14,13 @@ module.exports = {
     try {
       // Check if number provided
       if (!args.length) {
-        return extra.reply(`❌ *Please provide a phone number!*\n\n📝 *Usage:* .numberinfo 923018787786\n\n📌 *Example:* .numberinfo 923001234567\n\n👨‍💻 *Developer By Ammar Rai*`);
+        return extra.reply(`❌ Please provide a phone number!
+
+📝 Usage: .numberinfo 923018787786
+
+📌 Example: .numberinfo 923001234567
+
+👨‍💻 Developer By Ammar Rai`);
       }
 
       let phoneNumber = args[0];
@@ -22,7 +28,7 @@ module.exports = {
       // Clean the phone number (remove +, spaces, etc.)
       phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
       
-      // Remove country code if 92 or keep as is
+      // Format the number
       if (phoneNumber.startsWith('0')) {
         phoneNumber = '92' + phoneNumber.substring(1);
       } else if (phoneNumber.startsWith('92')) {
@@ -33,9 +39,15 @@ module.exports = {
         phoneNumber = '92' + phoneNumber;
       }
 
-      // Validate number length (should be 12 digits with country code)
+      // Validate number length
       if (phoneNumber.length < 10 || phoneNumber.length > 15) {
-        return extra.reply(`❌ *Invalid phone number!*\n\nPlease enter a valid number.\n\n📝 *Example:* 923001234567\n\n👨‍💻 *Developer By Ammar Rai*`);
+        return extra.reply(`❌ Invalid phone number!
+
+Please enter a valid number.
+
+📝 Example: 923001234567
+
+👨‍💻 Developer By Ammar Rai`);
       }
 
       // Show loading reaction
@@ -53,37 +65,42 @@ module.exports = {
         throw new Error('Number not found or API error');
       }
 
-      const developer = response.data.DEVELOPER_DETAILS;
       const result = response.data.SEARCH_RESULT;
-      const system = response.data.SYSTEM_LOG;
+      const name = (result.full_name || 'N/A').trim();
+      const number = result.phone_number || phoneNumber;
 
-      // Format the response message
-      const infoMessage = `╭━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃ 📱 *NUMBER INFORMATION* 📱
-╰━━━━━━━━━━━━━━━━━━━━━━━━╯
+      // Auto box design function
+      function makeBox(title, content) {
+        const boxWidth = 23;
+        const topLine = '┌' + '─'.repeat(boxWidth) + '┐';
+        const titleLine = '│  ' + title + ' '.repeat(boxWidth - title.length - 2) + '│';
+        const midLine = '├' + '─'.repeat(boxWidth) + '┤';
+        const contentLine = '│  ' + content + ' '.repeat(boxWidth - content.length - 2) + '│';
+        const bottomLine = '└' + '─'.repeat(boxWidth) + '┘';
+        return `${topLine}\n${titleLine}\n${midLine}\n${contentLine}\n${bottomLine}`;
+      }
 
-👤 *Full Name:* ${result.full_name || 'N/A'}
-📞 *Phone Number:* ${result.phone_number || phoneNumber}
-🆔 *Facebook ID:* ${result.facebook_id || 'N/A'}
-🖼️ *Profile Image:* ${result.profile_img || 'Not Available'}
+      // Auto adjust based on name length
+      const nameDisplay = name.length > 19 ? name.substring(0, 16) + '...' : name;
+      const numberDisplay = number.length > 19 ? number : number;
 
-╭━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃ 📊 *SEARCH DETAILS*
-╰━━━━━━━━━━━━━━━━━━━━━━━━╯
+      // Fixed box design (properly aligned)
+      const infoMessage = `┌─────────────────────┐
+│  📱 SIM DATABASE    │
+└─────────────────────┘
 
-🔍 *Search Query:* ${system.formatted_input || phoneNumber}
-✅ *Status:* ${system.status || 'Success'}
+┌─────────────────────┐
+│  👤 OWNER NAME      │
+│  ${nameDisplay.padEnd(19)}│
+├─────────────────────┤
+│  📞 PHONE NUMBER    │
+│  ${numberDisplay.padEnd(19)}│
+└─────────────────────┘
 
-╭━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃ 👨‍💻 *DEVELOPER INFO*
-╰━━━━━━━━━━━━━━━━━━━━━━━━╯
-
-👨‍💻 *Name:* ${developer.name || 'Ammar Rai'}
-💬 *WhatsApp:* ${developer.whatsapp || '923018787786'}
-🏷️ *Status:* ${developer.status || 'Official API'}
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-👨‍💻 *Developer By Ammar Rai*`;
+┌─────────────────────┐
+│  👨‍💻 DEVELOPER     │
+│  AMMAR RAI          │
+└─────────────────────┘`;
 
       // Send the information
       await extra.reply(infoMessage);
@@ -92,19 +109,20 @@ module.exports = {
     } catch (error) {
       console.error('Number Info Error:', error);
       
-      let errorMessage = '❌ *Failed to get number information!*\n\n';
-      
-      if (error.code === 'ECONNABORTED') {
-        errorMessage += '⏰ Timeout: Server took too long to respond.\nPlease try again.';
-      } else if (error.response) {
-        errorMessage += `📡 API Error: ${error.response.status}\nNumber not found in database.`;
-      } else if (error.request) {
-        errorMessage += '🌐 Network Error: Cannot reach server.\nCheck your internet connection.';
-      } else {
-        errorMessage += `⚠️ Error: ${error.message}`;
-      }
-      
-      errorMessage += `\n\n📝 *Usage:* .numberinfo 923001234567\n\n📌 *Example:* .numberinfo 923018787786\n\n👨‍💻 *Developer By Ammar Rai*`;
+      const errorMessage = `┌─────────────────────┐
+│  ❌ ERROR          │
+└─────────────────────┘
+
+┌─────────────────────┐
+│  ⚠️ ${error.response ? 'NUMBER NOT FOUND' : error.code === 'ECONNABORTED' ? 'SERVER TIMEOUT' : 'NETWORK ERROR'.padEnd(19)} │
+└─────────────────────┘
+
+┌─────────────────────┐
+│  📝 .numberinfo    │
+│  923001234567      │
+└─────────────────────┘
+
+👨‍💻 Developer By Ammar Rai`;
       
       await extra.reply(errorMessage);
       await extra.react('❌');
