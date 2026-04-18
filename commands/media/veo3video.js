@@ -9,10 +9,12 @@ module.exports = {
   name: 'veo3',
   aliases: ['text2video', 't2v', 'generatevideo', 'aivideo'],
   category: 'media',
-  description: 'Convert text to video using Veo3 AI',
+  description: 'Convert text to video using Veo3 AI (Fast)',
   usage: '.veo3 <your text description>',
 
   async execute(sock, msg, args, extra) {
+    let tempFilePath = null; // Define variable outside try block
+    
     try {
       // Check if text provided
       if (!args.length) {
@@ -24,11 +26,11 @@ module.exports = {
       // Show loading reaction
       await extra.react('⏳');
 
-      // Call the API to generate video
+      // Call the API to generate video (Fast timeout)
       const apiUrl = `https://ammar-veo3-text-to-video-api.vercel.app/gen?prompt=${encodeURIComponent(prompt)}`;
       
       const response = await axios.get(apiUrl, {
-        timeout: 120000 // 2 minutes timeout for video generation
+        timeout: 30000 // 30 seconds timeout for fast generation
       });
 
       // Check if API returned success
@@ -37,15 +39,18 @@ module.exports = {
       }
 
       const result = response.data.result;
-      const videoUrl = result.video_url || result.url;
-      const videoId = result.id || Date.now();
+      const videoUrl = result.video_url || result.url || result.download_url;
+      
+      if (!videoUrl) {
+        throw new Error('No video URL received from API');
+      }
 
       // Download the video
       const videoResponse = await axios({
         method: 'get',
         url: videoUrl,
         responseType: 'stream',
-        timeout: 120000
+        timeout: 30000 // 30 seconds download timeout
       });
 
       // Create temp directory if it doesn't exist
@@ -55,7 +60,8 @@ module.exports = {
       }
 
       // Save video temporarily
-      const tempFilePath = path.join(tempDir, `veo3_${videoId}.mp4`);
+      const videoId = Date.now();
+      tempFilePath = path.join(tempDir, `veo3_${videoId}.mp4`);
       const writer = fs.createWriteStream(tempFilePath);
       
       videoResponse.data.pipe(writer);
@@ -66,6 +72,11 @@ module.exports = {
         writer.on('error', reject);
       });
 
+      // Check if file exists and has content
+      if (!fs.existsSync(tempFilePath)) {
+        throw new Error('Video file not saved properly');
+      }
+
       // Get file size
       const stats = fs.statSync(tempFilePath);
       const fileSizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
@@ -74,12 +85,9 @@ module.exports = {
       await sock.sendMessage(extra.from, {
         video: fs.readFileSync(tempFilePath),
         mimetype: 'video/mp4',
-        caption: `✅ *Video Generated Successfully!*\n\n🎬 *Prompt:* ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}\n📦 *Size:* ${fileSizeInMB} MB\n⏱️ *Time:* ${result.time_taken || 'N/A'}\n\n🎥 *Veo3 AI Generated Video*\n\n👨‍💻 *Developer By Ammar Rai*`
+        caption: `✅ *Video Generated Successfully!*\n\n🎬 *Prompt:* ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}\n📦 *Size:* ${fileSizeInMB} MB\n\n🎥 *Veo3 AI Generated Video*\n\n👨‍💻 *Developer By Ammar Rai*`
       }, { quoted: msg });
 
-      // Delete temp file
-      fs.unlinkSync(tempFilePath);
-      
       await extra.react('✅');
 
     } catch (error) {
@@ -88,7 +96,7 @@ module.exports = {
       let errorMessage = '❌ *Failed to generate video!*\n\n';
       
       if (error.code === 'ECONNABORTED') {
-        errorMessage += '⏰ Timeout: Video generation took too long.\nPlease try again with shorter text.';
+        errorMessage += '⏰ Server is busy. Please try again in a few seconds.\n\n💡 *Tip:* Try shorter text like:\n.veo3 cat playing';
       } else if (error.response) {
         errorMessage += `📡 API Error: ${error.response.status}\nThe server might be busy. Try again.`;
       } else if (error.request) {
@@ -97,14 +105,19 @@ module.exports = {
         errorMessage += `⚠️ Error: ${error.message}`;
       }
       
-      errorMessage += `\n\n📝 *Usage:* .veo3 a beautiful sunset\n\n👨‍💻 *Developer By Ammar Rai*`;
+      errorMessage += `\n\n📝 *Usage:* .veo3 beautiful sunset\n\n👨‍💻 *Developer By Ammar Rai*`;
       
       await extra.reply(errorMessage);
       await extra.react('❌');
       
-      // Clean up temp file if it exists
+    } finally {
+      // Clean up temp file if it exists (FIXED: tempFilePath defined now)
       if (tempFilePath && fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
+        try {
+          fs.unlinkSync(tempFilePath);
+        } catch (cleanupError) {
+          console.error('Cleanup error:', cleanupError);
+        }
       }
     }
   }
