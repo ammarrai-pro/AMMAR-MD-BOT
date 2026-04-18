@@ -26,9 +26,9 @@ module.exports = {
         targetUrl = 'https://' + targetUrl;
       }
 
-      // Send initial message
+      // Send initial loading message
       await extra.react('⏳');
-      const statusMsg = await extra.reply(`🔄 Converting website to ZIP...\n\n🌐 URL: ${targetUrl}\n⏱️ Please wait.\n\n👨‍💻 Developer By Ammar Rai`);
+      const statusMsg = await extra.reply(`🔄 Processing...\n\n👨‍💻 Developer By Ammar Rai`);
 
       // Call the API to get download URL
       const apiUrl = `https://ammar-web-to-zip-api.vercel.app/zip?url=${encodeURIComponent(targetUrl)}`;
@@ -45,12 +45,6 @@ module.exports = {
       const result = response.data.result;
       const downloadUrl = result.download_url;
       const domain = result.domain;
-
-      // EDIT SAME MESSAGE - Downloading status
-      await sock.sendMessage(extra.from, {
-        text: `📥 Downloading ZIP file for ${domain}...\n⏱️ This may take a moment.\n\n👨‍💻 Developer By Ammar Rai`,
-        edit: statusMsg.key
-      });
 
       // Download the ZIP file
       const zipResponse = await axios({
@@ -82,22 +76,16 @@ module.exports = {
       const stats = fs.statSync(tempFilePath);
       const fileSizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
 
-      // EDIT SAME MESSAGE - Sending file status
-      await sock.sendMessage(extra.from, {
-        text: `📦 Preparing ZIP file for ${domain}...\n📂 File Size: ${fileSizeInMB} MB\n\n👨‍💻 Developer By Ammar Rai`,
-        edit: statusMsg.key
-      });
+      // Delete the status message
+      await sock.sendMessage(extra.from, { delete: statusMsg.key });
 
-      // Send ZIP file directly to WhatsApp
+      // Send ONE message with ZIP file + all info + developer name
       await sock.sendMessage(extra.from, {
         document: fs.readFileSync(tempFilePath),
         mimetype: 'application/zip',
         fileName: `${domain}.zip`,
         caption: `✅ *Website Converted Successfully!*\n\n🌐 *Domain:* ${domain}\n📦 *File Size:* ${fileSizeInMB} MB\n⏱️ *Time Taken:* ${result.time_taken}\n\n📂 ZIP file contains the complete website.\n\n👨‍💻 *Developer By Ammar Rai*`
       }, { quoted: msg });
-
-      // Delete the status message after sending file
-      await sock.sendMessage(extra.from, { delete: statusMsg.key });
 
       // Delete temp file
       fs.unlinkSync(tempFilePath);
