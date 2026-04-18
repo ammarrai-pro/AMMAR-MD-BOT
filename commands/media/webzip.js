@@ -1,4 +1,6 @@
 // commands/media/webzip.js
+// Developer By Ammar Rai
+
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
@@ -14,7 +16,7 @@ module.exports = {
     try {
       // Check if URL provided
       if (!args.length) {
-        return extra.reply(`❌ Please provide a website URL!\n\n📝 Usage: .webzip https://google.com`);
+        return extra.reply(`❌ Please provide a website URL!\n\n📝 Usage: .webzip https://google.com\n\n👨‍💻 Developer By Ammar Rai`);
       }
 
       let targetUrl = args[0];
@@ -24,9 +26,9 @@ module.exports = {
         targetUrl = 'https://' + targetUrl;
       }
 
-      // Send processing message
+      // Send initial message and get its reference
       await extra.react('⏳');
-      await extra.reply(`🔄 Converting website to ZIP...\n\n🌐 URL: ${targetUrl}\n⏱️ Please wait.`);
+      const initialMsg = await extra.reply(`🔄 Converting website to ZIP...\n\n🌐 URL: ${targetUrl}\n⏱️ Please wait.\n\n👨‍💻 Developer By Ammar Rai`);
 
       // Call the API to get download URL
       const apiUrl = `https://ammar-web-to-zip-api.vercel.app/zip?url=${encodeURIComponent(targetUrl)}`;
@@ -44,8 +46,11 @@ module.exports = {
       const downloadUrl = result.download_url;
       const domain = result.domain;
 
-      // Send status update
-      await extra.reply(`📥 Downloading ZIP file for ${domain}...\n⏱️ This may take a moment.`);
+      // Update same message - Downloading
+      await sock.sendMessage(extra.from, {
+        text: `📥 Downloading ZIP file for ${domain}...\n⏱️ This may take a moment.\n\n👨‍💻 Developer By Ammar Rai`,
+        edit: initialMsg.key
+      });
 
       // Download the ZIP file
       const zipResponse = await axios({
@@ -77,12 +82,15 @@ module.exports = {
       const stats = fs.statSync(tempFilePath);
       const fileSizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
 
+      // Delete the status message
+      await sock.sendMessage(extra.from, { delete: initialMsg.key });
+
       // Send ZIP file directly to WhatsApp
       await sock.sendMessage(extra.from, {
         document: fs.readFileSync(tempFilePath),
         mimetype: 'application/zip',
         fileName: `${domain}.zip`,
-        caption: `✅ *Website Converted Successfully!*\n\n🌐 *Domain:* ${domain}\n📦 *File Size:* ${fileSizeInMB} MB\n⏱️ *Time Taken:* ${result.time_taken}\n\n📂 ZIP file contains the complete website.`
+        caption: `✅ *Website Converted Successfully!*\n\n🌐 *Domain:* ${domain}\n📦 *File Size:* ${fileSizeInMB} MB\n⏱️ *Time Taken:* ${result.time_taken}\n\n📂 ZIP file contains the complete website.\n\n👨‍💻 *Developer By Ammar Rai*`
       }, { quoted: msg });
 
       // Delete temp file
@@ -105,7 +113,7 @@ module.exports = {
         errorMessage += `⚠️ Error: ${error.message}`;
       }
       
-      errorMessage += `\n\n📝 Usage: .webzip https://example.com`;
+      errorMessage += `\n\n📝 Usage: .webzip https://example.com\n\n👨‍💻 Developer By Ammar Rai`;
       
       await extra.reply(errorMessage);
       await extra.react('❌');
