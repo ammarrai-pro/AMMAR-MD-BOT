@@ -2,15 +2,19 @@
 // Developer By Ammar Rai
 
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 module.exports = {
   name: 'tiktokprofile',
   aliases: ['ttprofile', 'ttuser', 'tiktokuser', 'ttinfo'],
   category: 'media',
-  description: 'Get TikTok profile information',
+  description: 'Get TikTok profile information with image',
   usage: '.tiktokprofile <username>',
 
   async execute(sock, msg, args, extra) {
+    let tempFilePath = null;
+    
     try {
       // Check if username provided
       if (!args.length) {
@@ -50,8 +54,27 @@ module.exports = {
       const likes = stats.total_likes.toLocaleString();
       const videos = stats.total_videos.toLocaleString();
 
-      // Simple design with developer name
-      const profileMessage = `📱 TIKTOK PROFILE
+      // Download profile image
+      const profilePicUrl = user.profile_pic;
+      let imageBuffer = null;
+      
+      if (profilePicUrl && profilePicUrl !== 'N/A') {
+        try {
+          const imageResponse = await axios({
+            method: 'get',
+            url: profilePicUrl,
+            responseType: 'arraybuffer',
+            timeout: 10000
+          });
+          imageBuffer = Buffer.from(imageResponse.data);
+        } catch (imgError) {
+          console.error('Image download error:', imgError);
+          // Continue without image
+        }
+      }
+
+      // Create text message
+      const profileText = `📱 TIKTOK PROFILE
 
 👤 USER INFO
    📛 Name: ${user.display_name || 'N/A'}
@@ -64,12 +87,20 @@ module.exports = {
    ❤️ Likes: ${likes}
    🎬 Videos: ${videos}
 
-👨‍💻 DEVELOPER: ${developer || 'AMMAR-RAI TECH™'}
+👨‍💻 DEVELOPER: ${developer || 'AMMAR-RAI TECH™'}`;
 
-👨‍💻 Developer By Ammar Rai`;
-
-      // Send the information
-      await extra.reply(profileMessage);
+      // Send image first if available, then text
+      if (imageBuffer) {
+        // Send profile image
+        await sock.sendMessage(extra.from, {
+          image: imageBuffer,
+          caption: profileText
+        }, { quoted: msg });
+      } else {
+        // Send only text if no image
+        await extra.reply(profileText);
+      }
+      
       await extra.react('✅');
 
     } catch (error) {
@@ -85,6 +116,16 @@ module.exports = {
       
       await extra.reply(errorMessage);
       await extra.react('❌');
+      
+    } finally {
+      // Clean up temp file if exists
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        try {
+          fs.unlinkSync(tempFilePath);
+        } catch (cleanupError) {
+          console.error('Cleanup error:', cleanupError);
+        }
+      }
     }
   }
 };
